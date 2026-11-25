@@ -34,6 +34,9 @@ export interface Unit {
   cooldown: number;
   // última posición de destino de minería, para volver al campo cuando se agota un asteroide
   lastField: Vec | null;
+  // ticks seguidos sin acercarse al destino (para dar la llegada por buena en un grupo apretado)
+  stall?: number;
+  lastDist?: number;
 }
 
 export interface QueueItem { item: UnitType | 'era'; progress: number; total: number }

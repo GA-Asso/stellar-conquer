@@ -238,14 +238,33 @@ export function formation(to: Vec, n: number, spacing = 5): Vec[] {
   return out;
 }
 
+// saca un punto de destino fuera de asteroides y planetas, para que nadie intente llegar a donde no cabe
+function clearSpot(s: SimState, p: Vec, r: number): Vec {
+  const out = { ...p };
+  for (const e of s.entities.values()) {
+    if (e.kind !== 'asteroid' && e.kind !== 'planet') continue;
+    const min = e.radius + r + 1.5;
+    const dx = out.x - e.pos.x, dz = out.z - e.pos.z;
+    const d = Math.hypot(dx, dz);
+    if (d >= min) continue;
+    const k = d > 1e-3 ? min / d : 0;
+    out.x = d > 1e-3 ? e.pos.x + dx * k : e.pos.x + min;
+    out.z = d > 1e-3 ? e.pos.z + dz * k : e.pos.z;
+  }
+  return out;
+}
+
 export function applyCommand(s: SimState, side: Side, cmd: Command) {
   const pl = s.players[side];
   if (!pl.alive || s.winner !== null) return;
   switch (cmd.kind) {
     case 'move': {
       const us = ownedUnits(s, side, cmd.units);
-      const spots = formation(cmd.to, us.length, 5.5);
-      us.forEach((u, i) => { u.order = { kind: 'move', to: spots[i], aggressive: !!cmd.aggressive }; });
+      const spacing = Math.max(4, ...us.map(u => UNITS[u.type].radius * 2.4));
+      // los más grandes van al centro, así el grupo no se cruza al llegar
+      us.sort((a, b) => UNITS[b.type].radius - UNITS[a.type].radius || dist(a.pos, cmd.to) - dist(b.pos, cmd.to));
+      const spots = formation(cmd.to, us.length, spacing).map((p, i) => clearSpot(s, p, UNITS[us[i]?.type ?? 'drone'].radius));
+      us.forEach((u, i) => { u.order = { kind: 'move', to: spots[i], aggressive: !!cmd.aggressive }; u.stall = 0; u.lastDist = undefined; });
       break;
     }
     case 'attack': {
@@ -333,6 +352,7 @@ export function step(s: SimState, cmds: SideCommand[] = []) {
   if (s.winner !== null) return;
   for (const c of cmds) applyCommand(s, c.side, c.cmd);
   obstacles = [];
+  moving.clear();
   for (const e of s.entities.values()) if (e.kind === 'asteroid' || e.kind === 'planet') obstacles.push(e);
 
   for (const e of [...s.entities.values()]) {
@@ -387,6 +407,8 @@ function reap(s: SimState) {
 }
 
 let obstacles: (Asteroid | Planet)[] = [];
+// unidades que se movieron por su cuenta este tick
+const moving = new Set<number>();
 
 function moveTowards(u: Unit, to: Vec, stop: number): boolean {
   const dx = to.x - u.pos.x, dz = to.z - u.pos.z;
@@ -420,6 +442,7 @@ function moveTowards(u: Unit, to: Vec, stop: number): boolean {
     nx /= l; nz /= l;
   }
   const sp = Math.min(UNITS[u.type].speed * DT, d - stop);
+  moving.add(u.id);
   u.pos.x += nx * sp;
   u.pos.z += nz * sp;
   u.facing = Math.atan2(nx, nz);
@@ -496,7 +519,15 @@ function stepUnit(s: SimState, u: Unit) {
           break;
         }
       }
-      if (moveTowards(u, o.to, 0.5)) u.order = { kind: 'idle' };
+      // avance real desde el tick anterior (ya con los empujones de la separación aplicados)
+      const now = dist(u.pos, o.to);
+      const gained = (u.lastDist ?? Infinity) - now;
+      u.lastDist = now;
+      u.stall = gained < d.speed * DT * 0.25 ? (u.stall ?? 0) + 1 : 0;
+      // si el grupo ya ocupa el destino o algo lo bloquea, da la llegada por buena en vez de empujar para siempre
+      if (moveTowards(u, o.to, 0.5) || (u.stall > 8 && now < 6 + d.radius * 3) || u.stall > 50) {
+        u.order = { kind: 'idle' }; u.stall = 0; u.lastDist = undefined;
+      }
       break;
     }
     case 'attack': {
@@ -636,23 +667,37 @@ function stepModule(s: SimState, m: Module) {
 }
 
 // empuja unidades que se superponen entre sí y con obstáculos
+// capas de vuelo: los drones se cruzan con todo, las naves vuelan por encima de los robots
+function layer(u: Unit): 0 | 1 | 2 {
+  const cls = UNITS[u.type].cls;
+  return cls === 'worker' ? 0 : cls === 'ship' ? 1 : 2;
+}
+
 function separate(s: SimState) {
   const us = units(s);
   for (let i = 0; i < us.length; i++) {
     const a = us[i];
+    const la = layer(a);
+    if (la === 0) continue;
     const ra = UNITS[a.type].radius;
     for (let j = i + 1; j < us.length; j++) {
       const b = us[j];
+      if (layer(b) !== la) continue;
       const rb = UNITS[b.type].radius;
       const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
-      const min = (ra + rb) * 0.85;
+      const min = (ra + rb) * 0.9;
       const d2 = dx * dx + dz * dz;
       if (d2 >= min * min) continue;
-      const d = Math.sqrt(d2) || 0.01;
-      const push = (min - d) * 0.25;
-      const nx = d2 === 0 ? 1 : dx / d, nz = d2 === 0 ? 0 : dz / d;
-      a.pos.x -= nx * push; a.pos.z -= nz * push;
-      b.pos.x += nx * push; b.pos.z += nz * push;
+      const d = Math.sqrt(d2);
+      const nx = d > 1e-4 ? dx / d : Math.cos(a.id), nz = d > 1e-4 ? dz / d : Math.sin(a.id);
+      const overlap = min - d;
+      // quien está quieto le cede el paso a quien se mueve; dos quietos se acomodan despacio
+      const am = moving.has(a.id), bm = moving.has(b.id);
+      let ka = 0.5, kb = 0.5;
+      if (am && !bm) { ka = 0; kb = 1; } else if (bm && !am) { ka = 1; kb = 0; }
+      const push = Math.min(overlap * (am || bm ? 0.5 : 0.15), 0.6);
+      a.pos.x -= nx * push * ka; a.pos.z -= nz * push * ka;
+      b.pos.x += nx * push * kb; b.pos.z += nz * push * kb;
     }
   }
   // las unidades vuelan por encima de la estación: solo asteroides y planetas estorban

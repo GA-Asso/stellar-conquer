@@ -19,6 +19,7 @@ interface View {
   planet?: { material: THREE.ShaderMaterial; ring: THREE.Mesh };
   startAmount?: number;
   phase: number;
+  smooth?: { x: number; z: number };
 }
 
 export function altitude(e: Entity, t = 0, phase = 0): number {
@@ -163,7 +164,15 @@ export class GameView {
     for (const e of s.entities.values()) {
       alive.add(e.id);
       const v = this.views.get(e.id) ?? this.create(e);
-      const p = this.renderPos(e, alpha);
+      let p = this.renderPos(e, alpha);
+      if (e.kind === 'unit') {
+        // filtro suave: oculta los empujones de un tick entre unidades apretadas
+        if (!v.smooth || Math.hypot(v.smooth.x - p.x, v.smooth.z - p.z) > 12) v.smooth = { ...p };
+        const k = Math.min(1, dt * 14);
+        v.smooth.x += (p.x - v.smooth.x) * k;
+        v.smooth.z += (p.z - v.smooth.z) * k;
+        p = v.smooth;
+      }
       v.root.position.set(p.x, altitude(e, t, v.phase), p.z);
       for (const sp of v.spins) sp.obj.rotation[sp.axis] += sp.speed * dt;
       if (v.tick && (e.kind !== 'module' || e.built >= 1)) v.tick(t);
