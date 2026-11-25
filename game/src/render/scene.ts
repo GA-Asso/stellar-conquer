@@ -1,4 +1,4 @@
-// Escena espacial: cámara orbital, nebulosa procedural, campos de estrellas y bloom.
+// Escena espacial: cámara orbital, nebulosa procedural, polvo con paralaje y bloom.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -90,26 +90,6 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-function makeStars(count: number, radius: number, size: number, seed: number): THREE.Points {
-  let st = seed;
-  const rnd = () => { st = (st * 16807) % 2147483647; return st / 2147483647; };
-  const pos = new Float32Array(count * 3), col = new Float32Array(count * 3);
-  const tints = [new THREE.Color('#ffffff'), new THREE.Color('#fff3c4'), new THREE.Color('#c9d6ff'), new THREE.Color('#fdda24')];
-  for (let i = 0; i < count; i++) {
-    const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, r = radius * (0.85 + rnd() * 0.15);
-    const s = Math.sqrt(1 - u * u);
-    pos.set([Math.cos(a) * s * r, u * r, Math.sin(a) * s * r], i * 3);
-    const c = tints[Math.floor(rnd() * (rnd() < 0.9 ? 3 : 4))];
-    const b = 0.5 + rnd() * 0.8;
-    col.set([c.r * b, c.g * b, c.b * b], i * 3);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const m = new THREE.PointsMaterial({ size, vertexColors: true, sizeAttenuation: false, transparent: true, depthWrite: false });
-  return new THREE.Points(g, m);
-}
-
 // polvo estelar cercano: le da paralaje a la cámara al girar
 function makeDust(): THREE.Points {
   const n = 1800;
@@ -158,9 +138,6 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(2800, 48, 32), nebula);
   sky.renderOrder = -10;
   scene.add(sky);
-  const far = makeStars(5000, 2500, 1.4, 7);
-  const near = makeStars(900, 2200, 2.4, 13);
-  for (const p of [far, near]) { (p.material as THREE.PointsMaterial).fog = false; scene.add(p); }
   scene.add(makeDust());
 
   // sol lejano: luz principal y un halo que el bloom hace brillar
@@ -195,12 +172,8 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
     render(dt: number) {
       t += dt;
       nebula.uniforms.uTime.value = t;
-      far.rotation.y += dt * 0.002;
-      near.rotation.y -= dt * 0.003;
       rig.update(dt);
       sky.position.copy(camera.position);
-      far.position.copy(camera.position);
-      near.position.copy(camera.position);
       composer.render(dt);
     },
   };
