@@ -235,7 +235,7 @@ export class GameView {
           cargo.position.set(0, -1.2, 0);
           v.model.add(cargo);
         }
-        (cargo.material as THREE.MeshBasicMaterial).color.set(u.carry.res === 'lumen' ? new THREE.Color(3, 2.6, 0.5) : new THREE.Color(1.4, 1.5, 1.7));
+        (cargo.material as THREE.MeshBasicMaterial).color.set(u.carry.res === 'lumen' ? new THREE.Color(2.2, 1.8, 0.3) : new THREE.Color(1.1, 0.6, 0.35));
         cargo.visible = true;
         cargo.rotation.y += dt * 4;
       } else if (cargo) cargo.visible = false;
@@ -244,7 +244,7 @@ export class GameView {
       let beam = v.model.getObjectByName('beam') as THREE.Mesh | undefined;
       if (mining && !beam) {
         beam = new THREE.Mesh(new THREE.ConeGeometry(1.4, 4, 10, 1, true).rotateX(-Math.PI / 2).translate(0, -1.5, 3),
-          new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 2.1, 0.6), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+          new THREE.MeshBasicMaterial({ color: SIDE_COLORS[u.side].clone().multiplyScalar(1.4), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
         beam.name = 'beam';
         v.model.add(beam);
       }

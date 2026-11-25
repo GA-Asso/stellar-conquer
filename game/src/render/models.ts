@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { AsteroidKind, ModuleType, Owner, UnitType } from '../sim/types';
 
 export const SIDE_COLORS: Record<Owner, THREE.Color> = {
-  0: new THREE.Color('#fdda24'),
+  0: new THREE.Color('#2ee6ff'),
   1: new THREE.Color('#ff3d8b'),
   [-1]: new THREE.Color('#9aa3c7'),
 } as Record<Owner, THREE.Color>;
@@ -25,7 +25,7 @@ export function mats(side: Owner): Mats {
   if (m) return m;
   const c = SIDE_COLORS[side];
   m = {
-    hull: new THREE.MeshStandardMaterial({ color: 0xe8ebf2, metalness: 0.55, roughness: 0.35 }),
+    hull: new THREE.MeshStandardMaterial({ color: 0xdfe3ec, metalness: 0.3, roughness: 0.55 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x1b1f2e, metalness: 0.7, roughness: 0.4 }),
     trim: new THREE.MeshStandardMaterial({ color: c, metalness: 0.4, roughness: 0.3, emissive: c, emissiveIntensity: 0.15 }),
     // color > 1 para que el bloom lo haga brillar
@@ -330,7 +330,17 @@ export function buildUnit(type: UnitType, side: Owner): { group: THREE.Group; sp
   return { group: g, spins, engines };
 }
 
-// asteroides: icosaedros deformados; los de Lumen llevan cristales brillantes
+// asteroides: icosaedros deformados y mate. Lumen: roca violeta oscura con cristales dorados.
+// Metal: roca cobriza con vetas de hierro. Ningún color coincide con los de los equipos.
+const ASTEROID_MATS = {
+  lumenRock: new THREE.MeshStandardMaterial({ color: 0x2a2236, roughness: 1, metalness: 0, flatShading: true }),
+  crystal: new THREE.MeshStandardMaterial({
+    color: 0xffe680, emissive: new THREE.Color('#fdda24'), emissiveIntensity: 0.75, roughness: 0.7, metalness: 0, flatShading: true,
+  }),
+  metalRock: new THREE.MeshStandardMaterial({ color: 0x6a4a36, roughness: 1, metalness: 0, flatShading: true }),
+  vein: new THREE.MeshStandardMaterial({ color: 0xb87a4b, roughness: 0.8, metalness: 0.15, flatShading: true }),
+};
+
 export function buildAsteroid(kind: AsteroidKind, radius: number, seed: number): THREE.Group {
   let st = seed * 9301 + 49297;
   const rnd = () => { st = (st * 16807) % 2147483647; return st / 2147483647; };
@@ -341,29 +351,22 @@ export function buildAsteroid(kind: AsteroidKind, radius: number, seed: number):
     p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.8, p.getZ(i) * k);
   }
   geo.computeVertexNormals();
-  const rock = new THREE.MeshStandardMaterial({
-    color: kind === 'lumen' ? 0x3a3550 : 0x6b625a, roughness: 0.9, metalness: kind === 'metal' ? 0.5 : 0.1, flatShading: true,
-  });
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(geo, rock));
+  g.add(new THREE.Mesh(geo, kind === 'lumen' ? ASTEROID_MATS.lumenRock : ASTEROID_MATS.metalRock));
   if (kind === 'lumen') {
-    const crystal = new THREE.MeshStandardMaterial({
-      color: 0xfff4b0, emissive: new THREE.Color('#fdda24'), emissiveIntensity: 1.3, roughness: 0.2, metalness: 0.1, flatShading: true,
-    });
-    for (let i = 0; i < 4; i++) {
-      const c = new THREE.Mesh(new THREE.OctahedronGeometry(radius * (0.3 + rnd() * 0.25), 0), crystal);
-      c.scale.y = 2.2;
+    for (let i = 0; i < 5; i++) {
+      const c = new THREE.Mesh(new THREE.OctahedronGeometry(radius * (0.25 + rnd() * 0.25), 0), ASTEROID_MATS.crystal);
+      c.scale.y = 2.4;
       const a = rnd() * Math.PI * 2, e = rnd() * 0.8;
       c.position.set(Math.cos(a) * radius * 0.55, radius * (0.3 + e * 0.4), Math.sin(a) * radius * 0.55);
       c.rotation.set(rnd() - 0.5, rnd() * 3, rnd() - 0.5);
       g.add(c);
     }
   } else {
-    const vein = new THREE.MeshStandardMaterial({ color: 0xb8c4d6, metalness: 1, roughness: 0.25, flatShading: true });
-    for (let i = 0; i < 3; i++) {
-      const c = new THREE.Mesh(new THREE.BoxGeometry(radius * 0.5, radius * 0.25, radius * 0.4), vein);
+    for (let i = 0; i < 4; i++) {
+      const c = new THREE.Mesh(new THREE.DodecahedronGeometry(radius * (0.22 + rnd() * 0.15), 0), ASTEROID_MATS.vein);
       const a = rnd() * Math.PI * 2;
-      c.position.set(Math.cos(a) * radius * 0.6, radius * 0.35, Math.sin(a) * radius * 0.6);
+      c.position.set(Math.cos(a) * radius * 0.65, radius * (0.1 + rnd() * 0.4), Math.sin(a) * radius * 0.65);
       c.rotation.set(rnd(), rnd() * 3, rnd());
       g.add(c);
     }

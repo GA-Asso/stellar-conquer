@@ -188,7 +188,7 @@ export class Hud {
       } else {
         const owner = e.owner === -1 ? 'Neutral' : e.owner === this.side ? 'Tuyo' : 'Del rival';
         html = this.card(`Planeta ${e.name}`, `${owner}. Lleva robots (Mecha o Titán) a su órbita para conquistarlo: paga Lumens cada ledger.`, 0, 0, e.owner, `
-          <div class="progress cap"><i style="width:${Math.abs(e.capture) * 100}%; background:${e.capture >= 0 ? 'var(--stellar)' : 'var(--enemy)'}"></i><span>Control ${Math.round(Math.abs(e.capture) * 100)} %</span></div>`);
+          <div class="progress cap"><i style="width:${Math.abs(e.capture) * 100}%; background:${e.capture >= 0 ? 'var(--ally)' : 'var(--enemy)'}"></i><span>Control ${Math.round(Math.abs(e.capture) * 100)} %</span></div>`);
       }
     } else {
       const counts = new Map<string, number>();
@@ -282,10 +282,10 @@ export class Hud {
     const c = this.mctx, W = this.mini.width;
     c.fillStyle = '#05060d';
     c.fillRect(0, 0, W, W);
-    const col = (side: number) => side === 0 ? '#fdda24' : side === 1 ? '#ff3d8b' : '#9aa3c7';
+    const col = (side: number) => side === 0 ? '#2ee6ff' : side === 1 ? '#ff3d8b' : '#9aa3c7';
     for (const e of s.entities.values()) {
       const p = this.toMini(e.pos.x, e.pos.z);
-      if (e.kind === 'asteroid') { c.fillStyle = e.res === 'lumen' ? '#8a7a2a' : '#5c5a66'; c.fillRect(p.x - 1, p.y - 1, 2, 2); }
+      if (e.kind === 'asteroid') { c.fillStyle = e.res === 'lumen' ? '#c9a91c' : '#8a5a3a'; c.fillRect(p.x - 1, p.y - 1, 2, 2); }
       else if (e.kind === 'planet') {
         c.beginPath(); c.arc(p.x, p.y, e.radius * W / (MAP_HALF * 2), 0, Math.PI * 2);
         c.fillStyle = e.owner === -1 ? '#3a3f5c' : col(e.owner); c.globalAlpha = 0.6; c.fill(); c.globalAlpha = 1;

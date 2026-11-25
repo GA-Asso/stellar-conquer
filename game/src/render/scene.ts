@@ -164,7 +164,7 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
   scene.add(makeDust());
 
   // sol lejano: luz principal y un halo que el bloom hace brillar
-  const sun = new THREE.DirectionalLight(0xfff1d0, 2.4);
+  const sun = new THREE.DirectionalLight(0xfff1d0, 1.8);
   sun.position.set(-300, 400, 200);
   scene.add(sun);
   scene.add(new THREE.HemisphereLight(0x8fa3ff, 0x1a0b2e, 0.55));
