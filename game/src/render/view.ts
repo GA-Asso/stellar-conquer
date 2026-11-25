@@ -5,6 +5,7 @@ import { hexToWorld } from '../sim/hex';
 import { coreOf, dist } from '../sim/sim';
 import type { Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
 import { Fx } from './fx';
+import { iconSprite, MODULE_GLYPH } from './icons';
 import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, type Spin } from './models';
 import type { SpaceScene } from './scene';
 
@@ -12,6 +13,7 @@ interface View {
   root: THREE.Group;
   model: THREE.Group;
   spins: Spin[];
+  tick?: (t: number) => void;
   engines?: THREE.Object3D[];
   cage?: THREE.Mesh;
   planet?: { material: THREE.ShaderMaterial; ring: THREE.Mesh };
@@ -130,7 +132,12 @@ export class GameView {
         new THREE.MeshBasicMaterial({ color: SIDE_COLORS[e.side].clone().multiplyScalar(1.8), wireframe: true, transparent: true, opacity: 0.6 }),
       );
       root.add(cage);
-      v = { root, model: b.group, spins: b.spins, cage, phase: 0 };
+      // ícono flotante para reconocer cada módulo de un vistazo
+      const icon = iconSprite(MODULE_GLYPH[e.type], '#' + SIDE_COLORS[e.side].getHexString());
+      icon.position.y = e.type === 'beacon' ? 40 : e.type === 'core' ? 27 : 20;
+      icon.scale.setScalar(e.type === 'core' ? 0.044 : 0.034);
+      root.add(icon);
+      v = { root, model: b.group, spins: b.spins, tick: b.tick, cage, phase: 0 };
     } else if (e.kind === 'asteroid') {
       const g = buildAsteroid(e.res, e.radius, e.id);
       const root = new THREE.Group();
@@ -159,6 +166,7 @@ export class GameView {
       const p = this.renderPos(e, alpha);
       v.root.position.set(p.x, altitude(e, t, v.phase), p.z);
       for (const sp of v.spins) sp.obj.rotation[sp.axis] += sp.speed * dt;
+      if (v.tick && (e.kind !== 'module' || e.built >= 1)) v.tick(t);
 
       if (e.kind === 'unit') this.syncUnit(e, v, dt, t);
       else if (e.kind === 'module') {

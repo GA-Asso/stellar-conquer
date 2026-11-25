@@ -17,6 +17,10 @@ interface Mats {
   glow: THREE.MeshBasicMaterial;
   glass: THREE.MeshStandardMaterial;
   panel: THREE.MeshStandardMaterial;
+  deck: THREE.MeshStandardMaterial;
+  windows: THREE.MeshBasicMaterial;
+  furnace: THREE.MeshBasicMaterial;
+  portal: THREE.MeshBasicMaterial;
 }
 
 const matCache = new Map<Owner, Mats>();
@@ -29,9 +33,13 @@ export function mats(side: Owner): Mats {
     dark: new THREE.MeshStandardMaterial({ color: 0x1b1f2e, metalness: 0.7, roughness: 0.4 }),
     trim: new THREE.MeshStandardMaterial({ color: c, metalness: 0.4, roughness: 0.3, emissive: c, emissiveIntensity: 0.15 }),
     // color > 1 para que el bloom lo haga brillar
-    glow: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.6) }),
+    glow: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.15) }),
     glass: new THREE.MeshStandardMaterial({ color: 0x7fd8ff, metalness: 0.1, roughness: 0.05, emissive: 0x2a6aff, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }),
-    panel: new THREE.MeshStandardMaterial({ color: 0x14204a, metalness: 0.9, roughness: 0.2, emissive: 0x0b1f6b, emissiveIntensity: 0.5 }),
+    panel: new THREE.MeshStandardMaterial({ color: 0x14204a, metalness: 0.6, roughness: 0.35, emissive: 0x0b1f6b, emissiveIntensity: 0.5 }),
+    deck: new THREE.MeshStandardMaterial({ color: 0x2a3042, metalness: 0.4, roughness: 0.7 }),
+    windows: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.95, 0.85, 0.6) }),
+    furnace: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 0.9, 0.25) }),
+    portal: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.3), transparent: true, opacity: 0.55, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
   matCache.set(side, m);
   return m;
@@ -43,151 +51,213 @@ const sphere = (r: number, m: THREE.Material, w = 24, h = 16) => new THREE.Mesh(
 const torus = (r: number, t: number, m: THREE.Material, seg = 48) => new THREE.Mesh(new THREE.TorusGeometry(r, t, 10, seg), m);
 
 function at<T extends THREE.Object3D>(o: T, x: number, y: number, z: number): T { o.position.set(x, y, z); return o; }
+function flat<T extends THREE.Object3D>(o: T): T { o.rotation.x = Math.PI / 2; return o; }
 
-// base hexagonal común a todos los módulos: así se ve que encajan en la grilla
+// base hexagonal oscura con borde luminoso fino y luces en las esquinas: muestra la grilla sin tapar el módulo
 function hexBase(m: Mats, r: number): THREE.Group {
   const g = new THREE.Group();
-  const plate = cyl(r, r * 1.04, 1.4, m.dark, 6);
+  const plate = cyl(r, r * 1.06, 1.2, m.dark, 6);
   plate.rotation.y = Math.PI / 6;
-  g.add(at(plate, 0, 0.7, 0));
-  const rim = cyl(r * 1.05, r * 1.05, 0.35, m.trim, 6);
-  rim.rotation.y = Math.PI / 6;
-  g.add(at(rim, 0, 1.5, 0));
+  g.add(at(plate, 0, 0.6, 0));
+  const deck = cyl(r * 0.82, r * 0.82, 0.2, m.deck, 6);
+  deck.rotation.y = Math.PI / 6;
+  g.add(at(deck, 0, 1.25, 0));
+  const side = r; // lado de un hexágono regular = radio
+  for (let i = 0; i < 6; i++) {
+    const a0 = (i / 6) * Math.PI * 2, a1 = ((i + 1) / 6) * Math.PI * 2;
+    const mx = (Math.cos(a0) + Math.cos(a1)) / 2 * r * 0.99, mz = (Math.sin(a0) + Math.sin(a1)) / 2 * r * 0.99;
+    const edge = box(side * 0.92, 0.22, 0.32, m.trim);
+    edge.position.set(mx, 1.25, mz);
+    edge.rotation.y = -Math.atan2(mz, mx) + Math.PI / 2;
+    g.add(edge);
+    g.add(at(sphere(0.32, m.glow, 8, 6), Math.cos(a0) * r, 1.35, Math.sin(a0) * r));
+  }
   return g;
 }
 
-export function buildModule(type: ModuleType, side: Owner): { group: THREE.Group; spins: Spin[] } {
+// el logo de Stellar: un anillo con dos barras paralelas que lo cruzan en diagonal
+function stellarEmblem(m: Mats, r: number): THREE.Group {
+  const g = new THREE.Group();
+  g.add(torus(r, r * 0.09, m.glow, 48));
+  for (const dy of [-0.22, 0.22]) {
+    const bar = box(r * 2.7, r * 0.13, r * 0.13, m.glow);
+    bar.position.y = dy * r;
+    g.add(bar);
+  }
+  g.rotation.z = -0.3;
+  return g;
+}
+
+export interface ModuleModel { group: THREE.Group; spins: Spin[]; tick?: (t: number) => void }
+
+export function buildModule(type: ModuleType, side: Owner): ModuleModel {
   const m = mats(side);
   const g = new THREE.Group();
   const spins: Spin[] = [];
+  let tick: ((t: number) => void) | undefined;
   switch (type) {
     case 'core': {
       g.add(hexBase(m, 9));
-      g.add(at(cyl(4, 5.5, 6, m.hull, 24), 0, 4.5, 0));
-      const orb = at(sphere(4.6, m.hull), 0, 11, 0);
-      g.add(orb);
-      g.add(at(sphere(2.2, m.glow), 0, 11, 0));
-      // anillo orbital inclinado y dos barras: un guiño al logo de Stellar
-      const ringPivot = at(new THREE.Group(), 0, 11, 0);
-      const ring = torus(7.5, 0.3, m.glow, 64);
-      ring.rotation.x = Math.PI / 2 - 0.42;
-      ringPivot.add(ring);
-      g.add(ringPivot);
-      spins.push({ obj: ringPivot, axis: 'y', speed: 0.5 });
-      for (const y of [9.6, 12.4]) {
-        const bar = box(13, 0.5, 0.9, m.trim);
-        bar.rotation.z = -0.18;
-        g.add(at(bar, 0, y, 0));
+      // torre escalonada: tambor oscuro, anillo de ventanas, cuerpo blanco y esfera
+      g.add(at(cyl(6.2, 7, 2.4, m.dark, 24), 0, 2.4, 0));
+      g.add(at(cyl(5.2, 6, 1, m.windows, 24), 0, 4.1, 0));
+      g.add(at(cyl(4.2, 5.2, 4, m.hull, 24), 0, 6.6, 0));
+      g.add(at(sphere(4.2, m.hull), 0, 10.4, 0));
+      g.add(flat(at(torus(4.25, 0.18, m.trim, 40), 0, 10.4, 0)));
+      // brazos de atraque con balizas
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + 0.5;
+        const arm = box(7, 0.8, 1, m.hull);
+        arm.position.set(Math.cos(a) * 7, 4.6, Math.sin(a) * 7);
+        arm.rotation.y = -a;
+        g.add(arm);
+        g.add(at(sphere(0.55, m.glow, 8, 6), Math.cos(a) * 10.4, 4.6, Math.sin(a) * 10.4));
       }
-      const antenna = at(cyl(0.2, 0.2, 8, m.hull, 6), 0, 19, 0);
-      g.add(antenna);
-      g.add(at(sphere(0.6, m.glow), 0, 23, 0));
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        const pod = at(box(2.2, 2.2, 3.5, m.hull), Math.cos(a) * 6.8, 3.2, Math.sin(a) * 6.8);
-        pod.lookAt(0, 3.2, 0);
-        g.add(pod);
-      }
+      // logo de Stellar flotando y girando sobre el núcleo
+      const emblemPivot = at(new THREE.Group(), 0, 19, 0);
+      emblemPivot.add(stellarEmblem(m, 4));
+      g.add(emblemPivot);
+      spins.push({ obj: emblemPivot, axis: 'y', speed: 0.6 });
+      g.add(at(cyl(0.25, 0.25, 4, m.hull, 6), 0, 15.5, 0));
       break;
     }
     case 'habitat': {
       g.add(hexBase(m, 7));
-      g.add(at(cyl(1.6, 1.6, 6, m.hull), 0, 4, 0));
-      const pivot = at(new THREE.Group(), 0, 6.2, 0);
-      const wheel = torus(5.2, 1.3, m.hull, 40);
-      wheel.rotation.x = Math.PI / 2;
-      pivot.add(wheel);
-      for (let i = 0; i < 4; i++) {
-        const spoke = box(10.4, 0.5, 0.5, m.dark);
-        spoke.rotation.y = (i * Math.PI) / 4;
-        pivot.add(spoke);
+      // torre residencial de tres pisos con franjas de ventanas encendidas
+      for (let i = 0; i < 3; i++) {
+        g.add(at(cyl(3.6 - i * 0.4, 3.8 - i * 0.4, 2.2, m.hull, 20), 0, 2.6 + i * 2.8, 0));
+        g.add(at(cyl(3.65 - i * 0.4, 3.65 - i * 0.4, 0.5, m.windows, 20), 0, 3.9 + i * 2.8, 0));
       }
-      const windows = torus(5.2, 1.34, m.glass, 40);
-      windows.rotation.x = Math.PI / 2;
-      windows.scale.set(1, 1, 0.3);
-      pivot.add(windows);
-      g.add(pivot);
-      spins.push({ obj: pivot, axis: 'y', speed: 0.35 });
-      g.add(at(sphere(1.2, m.glow), 0, 8.5, 0));
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(2.6, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), m.glass);
+      g.add(at(dome, 0, 10.6, 0));
+      // pequeña rueda de gravedad en la cima
+      const wheel = at(new THREE.Group(), 0, 11.5, 0);
+      const ring = torus(4.2, 0.35, m.hull, 32);
+      ring.rotation.x = Math.PI / 2;
+      wheel.add(ring);
+      for (let i = 0; i < 3; i++) {
+        const spoke = box(8.4, 0.18, 0.18, m.trim);
+        spoke.rotation.y = (i * Math.PI) / 3;
+        wheel.add(spoke);
+      }
+      g.add(wheel);
+      spins.push({ obj: wheel, axis: 'y', speed: 0.5 });
       break;
     }
     case 'solar': {
       g.add(hexBase(m, 6.5));
-      g.add(at(cyl(0.6, 0.6, 7, m.hull, 8), 0, 5, 0));
-      const pivot = at(new THREE.Group(), 0, 8.5, 0);
-      for (const sx of [-1, 1]) {
+      g.add(at(cyl(1.4, 1.8, 2, m.dark, 8), 0, 2.2, 0));
+      g.add(at(cyl(0.45, 0.45, 6, m.hull, 8), 0, 6, 0));
+      // cuatro alas en cruz que siguen al sol
+      const pivot = at(new THREE.Group(), 0, 9, 0);
+      for (let w = 0; w < 4; w++) {
         const wing = new THREE.Group();
-        for (let i = 0; i < 3; i++) {
-          wing.add(at(box(2.6, 0.18, 4.4, m.panel), sx * (2.4 + i * 2.8), 0, 0));
-        }
-        wing.add(at(box(8.6, 0.25, 0.3, m.hull), sx * 5.2, 0, 0));
+        wing.rotation.y = (w * Math.PI) / 2 + Math.PI / 4;
+        for (let i = 0; i < 3; i++) wing.add(at(box(2.4, 0.14, 3.2, m.panel), 2 + i * 2.6, 0, 0));
+        wing.add(at(box(8, 0.2, 0.25, m.hull), 4.6, 0.1, 0));
         pivot.add(wing);
       }
-      pivot.rotation.x = -0.35;
+      pivot.rotation.x = -0.25;
       g.add(pivot);
-      spins.push({ obj: pivot, axis: 'y', speed: 0.12 });
-      g.add(at(sphere(0.9, m.glow), 0, 8.5, 0));
+      spins.push({ obj: pivot, axis: 'y', speed: 0.1 });
+      g.add(at(sphere(0.8, m.glow, 10, 8), 0, 9.4, 0));
       break;
     }
     case 'anchor': {
       g.add(hexBase(m, 7));
-      // ancla: mástil, travesaño y brazos curvos
-      g.add(at(cyl(0.9, 1.2, 12, m.hull, 10), 0, 7.5, 0));
-      g.add(at(box(7, 0.9, 0.9, m.hull), 0, 11.5, 0));
-      const arc = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.7, 8, 32, Math.PI), m.trim);
-      arc.rotation.z = Math.PI;
-      g.add(at(arc, 0, 6, 0));
-      g.add(at(torus(1.4, 0.4, m.hull), 0, 14.6, 0));
-      const beam = at(cyl(0.25, 0.25, 30, m.glow, 6), 0, 30, 0);
-      g.add(beam);
+      // puerta de anclaje: un portal vertical con disco de energía girando, como un puente entre redes
+      g.add(at(box(2, 3, 9, m.dark), 0, 2.6, 0));
+      const gate = at(new THREE.Group(), 0, 9.5, 0);
+      gate.add(torus(5, 0.7, m.hull, 40));
+      gate.add(torus(5.05, 0.25, m.trim, 40));
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(4.3, 40), m.portal);
+      gate.add(disc);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        gate.add(at(box(0.6, 0.6, 1.8, m.dark), Math.cos(a) * 5.4, Math.sin(a) * 5.4, 0));
+      }
+      g.add(gate);
+      spins.push({ obj: disc, axis: 'z', speed: 1.5 });
+      tick = t => { gate.rotation.y = Math.sin(t * 0.3) * 0.6; (m.portal as THREE.MeshBasicMaterial).opacity = 0.45 + 0.2 * Math.sin(t * 3); };
       break;
     }
     case 'hangar': {
       g.add(hexBase(m, 8));
-      const shell = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 12, 24, 1, true, 0, Math.PI), m.hull);
-      shell.rotation.z = Math.PI / 2;
-      shell.material = m.hull;
-      g.add(at(shell, 0, 3, 0));
-      g.add(at(box(12, 0.6, 12, m.dark), 0, 1.8, 0));
-      for (const x of [-5, 0, 5]) g.add(at(box(0.6, 0.2, 10, m.glow), x, 2.2, 0));
-      g.add(at(box(1, 7, 12.4, m.trim), -6.2, 5, 0));
-      g.add(at(box(1, 7, 12.4, m.trim), 6.2, 5, 0));
+      // casco alargado con bahía abierta, pista iluminada y torre de control
+      g.add(at(box(13, 1, 9, m.dark), 0, 1.9, 0));
+      for (const z of [-4, 4]) g.add(at(box(13, 4.5, 1, m.hull), 0, 4.6, z));
+      g.add(at(box(13, 0.8, 9.6, m.hull), -1.5, 7.2, 0));
+      for (let i = 0; i < 6; i++) g.add(at(box(0.9, 0.12, 0.5, m.glow), -5.5 + i * 2.2, 2.45, 0));
+      g.add(at(cyl(0.9, 1.1, 5, m.hull, 10), -5, 10, -3));
+      g.add(at(cyl(1.8, 1.4, 1.6, m.glass, 10), -5, 13.2, -3));
+      const radar = at(new THREE.Group(), -5, 14.4, -3);
+      const dish = new THREE.Mesh(new THREE.SphereGeometry(1.4, 12, 6, 0, Math.PI * 2, 0, Math.PI / 3), m.hull);
+      dish.rotation.x = Math.PI / 2.3;
+      radar.add(dish);
+      g.add(radar);
+      spins.push({ obj: radar, axis: 'y', speed: 1.2 });
       break;
     }
     case 'factory': {
       g.add(hexBase(m, 8));
-      g.add(at(box(9, 6, 9, m.dark), 0, 4.5, 0));
-      g.add(at(box(9.4, 0.8, 9.4, m.trim), 0, 7.8, 0));
-      for (const [x, z] of [[-3, -3], [3, 3]]) {
-        g.add(at(cyl(1.2, 1.6, 9, m.hull, 10), x, 9, z));
-        g.add(at(sphere(0.8, m.glow), x, 14, z));
+      // bloque industrial con horno encendido, pórtico de grúa y brazos robóticos
+      g.add(at(box(9, 5.5, 7, m.dark), -0.5, 4, 0));
+      g.add(at(box(6, 1.6, 0.3, m.furnace), -0.5, 3.6, 3.6));
+      g.add(at(box(9.4, 0.6, 7.4, m.trim), -0.5, 7, 0));
+      for (const x of [-4, 3]) g.add(at(cyl(0.9, 1.2, 8, m.hull, 8), x, 9, -2.5));
+      for (const x of [-4, 3]) g.add(at(cyl(0.95, 0.95, 0.5, m.furnace, 8), x, 13.1, -2.5));
+      for (const x of [-6.5, 5.5]) g.add(at(box(0.6, 12, 0.6, m.hull), x, 7, 3.5));
+      g.add(at(box(12.6, 0.7, 0.7, m.hull), -0.5, 13, 3.5));
+      const arms: THREE.Group[] = [];
+      for (const x of [-2.5, 2]) {
+        const arm = at(new THREE.Group(), x, 7.5, 2.5);
+        const seg = at(box(0.6, 0.6, 4, m.hull), 0, 0, 1.6);
+        seg.rotation.x = 0.5;
+        arm.add(seg);
+        arm.add(at(sphere(0.5, m.furnace, 8, 6), 0, -1, 3.4));
+        g.add(arm);
+        arms.push(arm);
       }
-      // brazo robótico giratorio
-      const arm = at(new THREE.Group(), 3, 8.5, -3);
-      arm.add(at(box(0.8, 0.8, 7, m.hull), 0, 0.5, 3));
-      arm.add(at(sphere(0.9, m.trim), 0, 0.5, 6.5));
-      g.add(arm);
-      spins.push({ obj: arm, axis: 'y', speed: 0.9 });
+      tick = t => arms.forEach((a, i) => { a.rotation.y = Math.sin(t * 1.4 + i * 2) * 0.7; });
       break;
     }
     case 'lab': {
       g.add(hexBase(m, 7));
-      const dome = new THREE.Mesh(new THREE.SphereGeometry(5.5, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), m.glass);
-      g.add(at(dome, 0, 1.6, 0));
-      g.add(at(sphere(1.8, m.glow), 0, 4.5, 0));
-      const pivot = at(new THREE.Group(), 0, 4.5, 0);
-      for (let i = 0; i < 3; i++) {
-        const r = torus(3.2, 0.12, m.trim, 40);
-        r.rotation.set(i * 1.05, i * 0.7, 0);
-        pivot.add(r);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(4.2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), m.glass);
+      g.add(at(dome, -1.2, 1.4, 1));
+      g.add(at(sphere(1.2, m.glow, 12, 8), -1.2, 3, 1));
+      // un soroban (ábaco japonés) gigante: varillas con cuentas que se deslizan calculando
+      const abacus = at(new THREE.Group(), 2.2, 6.5, -2.6);
+      abacus.rotation.y = -0.5;
+      for (const y of [-3, 3]) abacus.add(at(box(8, 0.5, 0.5, m.hull), 0, y, 0));
+      for (const x of [-4, 4]) abacus.add(at(box(0.5, 6.5, 0.5, m.hull), x, 0, 0));
+      abacus.add(at(box(8, 0.25, 0.3, m.trim), 0, 1.4, 0));
+      const beads: THREE.Mesh[] = [];
+      for (let i = 0; i < 5; i++) {
+        const x = -3 + i * 1.5;
+        abacus.add(at(cyl(0.08, 0.08, 6, m.hull, 4), x, 0, 0));
+        for (let j = 0; j < 3; j++) {
+          const bead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 6), j === 0 ? m.glow : m.trim);
+          bead.scale.y = 0.6;
+          bead.position.set(x, -2.2 + j * 0.7, 0);
+          bead.userData.base = bead.position.y;
+          bead.userData.phase = i * 1.3 + j * 0.4;
+          abacus.add(bead);
+          beads.push(bead);
+        }
       }
-      g.add(pivot);
-      spins.push({ obj: pivot, axis: 'y', speed: 1.4 });
+      g.add(at(box(1, 6.5, 1, m.dark), 2.2, 3.2, -2.6));
+      g.add(abacus);
+      tick = t => beads.forEach(b => {
+        const k = Math.max(0, Math.sin(t * 1.2 + b.userData.phase));
+        b.position.y = b.userData.base + k * 1.6;
+      });
       break;
     }
     case 'turret': {
       g.add(hexBase(m, 6));
       g.add(at(cyl(3, 3.8, 3, m.dark, 12), 0, 3, 0));
+      g.add(flat(at(torus(3.1, 0.2, m.trim, 24), 0, 4.5, 0)));
       const head = at(new THREE.Group(), 0, 6, 0);
       head.add(sphere(2.6, m.hull));
       for (const x of [-1, 1]) {
@@ -196,17 +266,21 @@ export function buildModule(type: ModuleType, side: Owner): { group: THREE.Group
         head.add(at(barrel, x * 1.1, 0.4, 3.4));
         head.add(at(sphere(0.4, m.glow), x * 1.1, 0.4, 6.4));
       }
-      head.userData.aim = true;
       g.add(head);
+      tick = t => { head.rotation.y = Math.sin(t * 0.5) * 1.2; };
       break;
     }
     case 'beacon': {
       g.add(hexBase(m, 9));
       g.add(at(cyl(1.5, 4, 26, m.hull, 8), 0, 14, 0));
-      g.add(at(sphere(3, m.glow), 0, 29, 0));
+      g.add(at(cyl(1.55, 1.55, 18, m.windows, 8), 0, 16, 0));
+      const top = at(new THREE.Group(), 0, 31, 0);
+      top.add(stellarEmblem(m, 4.5));
+      g.add(top);
+      spins.push({ obj: top, axis: 'y', speed: 0.8 });
       for (let i = 0; i < 3; i++) {
-        const pivot = at(new THREE.Group(), 0, 10 + i * 7, 0);
-        const r = torus(6 - i * 1.3, 0.4, m.trim, 48);
+        const pivot = at(new THREE.Group(), 0, 8 + i * 6, 0);
+        const r = torus(6.5 - i * 1.4, 0.35, m.trim, 48);
         r.rotation.x = Math.PI / 2 + (i - 1) * 0.3;
         pivot.add(r);
         g.add(pivot);
@@ -215,7 +289,7 @@ export function buildModule(type: ModuleType, side: Owner): { group: THREE.Group
       break;
     }
   }
-  return { group: g, spins };
+  return { group: g, spins, tick };
 }
 
 export function buildUnit(type: UnitType, side: Owner): { group: THREE.Group; spins: Spin[]; engines: THREE.Object3D[] } {
