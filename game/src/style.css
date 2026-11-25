@@ -1,0 +1,14 @@
+:root {
+  --bg: #05060a;
+  --ink: #f4f4f6;
+  --muted: #8a8fa3;
+  --stellar: #fdda24;
+  --violet: #7b5cff;
+  --panel: rgba(12, 14, 24, 0.82);
+  --line: rgba(255, 255, 255, 0.12);
+  --good: #4ade80;
+  --bad: #ff5468;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font-family: 'Inter Tight', system-ui, sans-serif; }
+#app { position: fixed; inset: 0; }
