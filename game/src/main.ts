@@ -1,7 +1,7 @@
 import './style.css';
 import { aiThink, createAi, type AiMemory, type Difficulty } from './sim/ai';
 import { DT } from './sim/defs';
-import { applyCommand, coreOf, createSim, freePorts, modules, step, units, type SideCommand } from './sim/sim';
+import { addUnit, applyCommand, coreOf, createSim, freePorts, modules, step, units, type SideCommand } from './sim/sim';
 import type { Command, Side, SimState } from './sim/types';
 import { createSpaceScene } from './render/scene';
 import { GameView } from './render/view';
@@ -65,9 +65,11 @@ function start(diff: Difficulty) {
   window.addEventListener('keydown', e => { if (e.key === 'Backspace' && game) { hud.hotkey('Backspace'); e.preventDefault(); } });
   hud = new Hud(app, space, view, input, LOCAL, send);
   game = { sim, ai: createAi(1, diff), view, input, hud, pending, ended: false };
-  if (new URLSearchParams(location.search).has('vitrina')) showcase(sim);
+  const vitrina = new URLSearchParams(location.search).has('vitrina');
+  if (vitrina) showcase(sim);
   const core = coreOf(sim, LOCAL)!;
   space.rig.lookAt(core.pos.x + 20, core.pos.z - 20);
+  if (vitrina) { space.rig.lookAt(-70, 51); space.rig.zoom(0.5); }
   input.ui.selected.add(core.id);
   hud.toast('Selecciona tus drones y mina los asteroides dorados (Lumens) y cobrizos (metal).', 'info');
 }
@@ -85,7 +87,14 @@ function showcase(sim: SimState) {
   const core = coreOf(sim, LOCAL)!;
   applyCommand(sim, LOCAL, { kind: 'build', units: [drone], module: 'anchor', hex: { q: core.hex.q + 4, r: core.hex.r - 3 } });
   for (const m of modules(sim, LOCAL)) { m.built = 1; m.hp = m.maxHp; }
+  // desfile de unidades de ambos equipos en espacio abierto
+  const types = ['drone', 'interceptor', 'mecha', 'frigate', 'titan', 'dreadnought'] as const;
+  types.forEach((t, i) => {
+    addUnit(sim, t, 0, { x: -110 + i * 16, z: 40 });
+    addUnit(sim, t, 1, { x: -110 + i * 16, z: 62 });
+  });
   for (const m of modules(sim, LOCAL)) {
+    if (m.type === 'hangar' || m.type === 'factory') m.rally = { x: core.pos.x + 55, z: core.pos.z + (m.type === 'hangar' ? -10 : 15) };
     if (m.type === 'hangar') for (const u of ['interceptor', 'frigate', 'dreadnought'] as const) m.queue.push({ item: u, progress: 99, total: 1 });
     if (m.type === 'factory') for (const u of ['mecha', 'titan'] as const) m.queue.push({ item: u, progress: 99, total: 1 });
   }

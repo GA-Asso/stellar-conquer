@@ -71,7 +71,7 @@ export const STEPS: Step[] = [
   {
     title: 'Destruye el Núcleo rival',
     how: 'La estación enemiga (rosa) está en la esquina opuesta del minimapa. Junta naves y robots, selecciónalos y Ctrl+clic derecho para avanzar atacando todo lo que encuentren.',
-    done: (s, side) => s.winner === side || (hasBuilt(s, side, 'beacon')),
+    done: (s, side) => s.winner === side,
   },
 ];
 

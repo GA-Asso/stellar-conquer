@@ -70,7 +70,7 @@ export function coreOf(s: SimState, side: Side): Module | undefined {
 
 // ---------- creación ----------
 
-function addUnit(s: SimState, type: UnitType, side: Side, pos: Vec): Unit {
+export function addUnit(s: SimState, type: UnitType, side: Side, pos: Vec): Unit {
   const d = UNITS[type];
   const u: Unit = {
     id: s.nextId++, kind: 'unit', type, side, pos: { ...pos }, facing: 0, hp: d.hp, maxHp: d.hp,
