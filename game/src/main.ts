@@ -1,7 +1,7 @@
 import './style.css';
 import { aiThink, createAi, type AiMemory, type Difficulty } from './sim/ai';
 import { DT } from './sim/defs';
-import { coreOf, createSim, step, type SideCommand } from './sim/sim';
+import { applyCommand, coreOf, createSim, freePorts, modules, step, units, type SideCommand } from './sim/sim';
 import type { Command, Side, SimState } from './sim/types';
 import { createSpaceScene } from './render/scene';
 import { GameView } from './render/view';
@@ -59,10 +59,30 @@ function start(diff: Difficulty) {
   window.addEventListener('keydown', e => { if (e.key === 'Backspace' && game) { hud.hotkey('Backspace'); e.preventDefault(); } });
   hud = new Hud(app, space, view, input, LOCAL, send);
   game = { sim, ai: createAi(1, diff), view, input, hud, pending, ended: false };
+  if (new URLSearchParams(location.search).has('vitrina')) showcase(sim);
   const core = coreOf(sim, LOCAL)!;
   space.rig.lookAt(core.pos.x + 20, core.pos.z - 20);
   input.ui.selected.add(core.id);
   hud.toast('Selecciona tus drones y mina los asteroides dorados (Lumens) y grises (metal).', 'info');
+}
+
+// ?vitrina: arma al instante una estación con todos los módulos y unidades, para revisar diseños
+function showcase(sim: SimState) {
+  const pl = sim.players[LOCAL];
+  pl.era = 4;
+  pl.res = { lumens: 1e5, metal: 1e5, energy: 1e5 };
+  const drone = units(sim, LOCAL)[0].id;
+  for (const t of ['habitat', 'solar', 'hangar', 'factory', 'lab', 'turret', 'beacon', 'habitat', 'solar'] as const) {
+    const hex = freePorts(sim, LOCAL, t)[0];
+    if (hex) applyCommand(sim, LOCAL, { kind: 'build', units: [drone], module: t, hex });
+  }
+  const core = coreOf(sim, LOCAL)!;
+  applyCommand(sim, LOCAL, { kind: 'build', units: [drone], module: 'anchor', hex: { q: core.hex.q + 4, r: core.hex.r - 3 } });
+  for (const m of modules(sim, LOCAL)) { m.built = 1; m.hp = m.maxHp; }
+  for (const m of modules(sim, LOCAL)) {
+    if (m.type === 'hangar') for (const u of ['interceptor', 'frigate', 'dreadnought'] as const) m.queue.push({ item: u, progress: 99, total: 1 });
+    if (m.type === 'factory') for (const u of ['mecha', 'titan'] as const) m.queue.push({ item: u, progress: 99, total: 1 });
+  }
 }
 
 let last = performance.now();
