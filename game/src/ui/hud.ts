@@ -6,8 +6,31 @@ import type { Command, Entity, Module, ModuleType, Res, Side, SimState, Unit, Un
 import type { GameView } from '../render/view';
 import type { SpaceScene } from '../render/scene';
 import type { Input } from './input';
+import { MODULE_GLYPH, UNIT_GLYPH } from '../render/icons';
+import { Tutorial } from './tutorial';
 
-interface Button { key: string; label: string; sub: string; cost?: Res; enabled: boolean; why?: string; run: () => void; progress?: number }
+// explicación larga de cada botón: para qué sirve y cuándo conviene
+const MODULE_HELP: Record<ModuleType, string> = {
+  core: '',
+  habitat: 'Aumenta tu población máxima en 8. Constrúyelo cuando el contador de población (arriba) esté cerca del límite.',
+  solar: 'Produce energía sin parar. La energía se gasta en Fragatas, Titanes, Acorazados, torretas y eras avanzadas.',
+  anchor: 'Puesto avanzado: se puede colocar LEJOS de tu estación, junto a un campo de asteroides. Los drones descargan ahí y viajan menos. Se le pueden acoplar módulos.',
+  hangar: 'Fabrica naves: Interceptores (rápidos), Fragatas (era Consenso, artillería) y el Acorazado (era Galáctica).',
+  factory: 'Fabrica robots de abordaje: Mechas y Titanes. Son los únicos que conquistan planetas y hacen doble daño a módulos.',
+  lab: 'Laboratorio Soroban: necesario para avanzar de era desde el Núcleo. Además, tus drones minan un 20 % más rápido.',
+  turret: 'Defensa automática que dispara a las unidades enemigas cercanas. Ponla en el lado que mira al rival.',
+  beacon: 'La maravilla. Si resiste 30 ledgers (~2,5 min) ganas la partida. El rival intentará destruirlo.',
+};
+const UNIT_HELP: Record<UnitType, string> = {
+  drone: 'Trabajador: mina asteroides (clic derecho sobre uno) y ensambla o repara módulos. No combate bien.',
+  interceptor: 'Caza barato y veloz. Bueno para cazar drones y robots, débil contra estaciones.',
+  mecha: 'Robot de abordaje: hace doble daño a módulos. Llévalo a la órbita de un planeta para conquistarlo.',
+  frigate: 'Artillería de plasma de largo alcance. Destroza otras naves.',
+  titan: 'Robot pesado que demuele estaciones y conquista planetas rápido.',
+  dreadnought: 'Nave insignia, enorme y muy resistente. Ideal para el asalto final.',
+};
+
+interface Button { key: string; label: string; sub: string; cost?: Res; enabled: boolean; why?: string; run: () => void; glyph?: string; help?: string }
 
 const fmt = (n: number) => Math.floor(n).toLocaleString('es');
 const costText = (c: Res) => [
@@ -29,6 +52,10 @@ export class Hud {
   private buttonsKey = '';
   private toasts: HTMLDivElement;
   private lastAlert = 0;
+  private tutorial: Tutorial;
+  private tip: HTMLDivElement;
+  private hoverLabel: HTMLDivElement;
+  private highlight: string | undefined;
 
   constructor(
     host: HTMLElement,
@@ -48,8 +75,8 @@ export class Hud {
     this.root.innerHTML = `
       <div class="topbar">
         <div class="brand"><span class="logo"></span>STELLAR<b>CONQUER</b></div>
-        <div class="res" data-tip="Lumens (XLM): se minan en asteroides de cristal"><i class="ico l"></i><span id="r-l"></span></div>
-        <div class="res" data-tip="Metal: se mina en asteroides rocosos"><i class="ico m"></i><span id="r-m"></span></div>
+        <div class="res" data-tip="Lumens (XLM): se minan en asteroides con cristales dorados"><i class="ico l"></i><span id="r-l"></span></div>
+        <div class="res" data-tip="Metal: se mina en asteroides cobrizos"><i class="ico m"></i><span id="r-m"></span></div>
         <div class="res" data-tip="Energía: la generan los paneles solares"><i class="ico e"></i><span id="r-e"></span></div>
         <div class="res" data-tip="Población"><i class="ico p"></i><span id="r-p"></span></div>
         <div class="era" id="era"></div>
@@ -61,8 +88,21 @@ export class Hud {
         <div class="selection" id="sel"></div>
         <div class="commands" id="cmds"></div>
       </div>
-      <div class="help">Clic: seleccionar · Arrastrar: recuadro · Clic derecho: mover / atacar / minar · Ctrl+clic der.: avanzar atacando<br>
-      Rueda: zoom · Clic central o Alt+arrastrar: girar e inclinar la galaxia · Z/X girar · C/V inclinar · Flechas: desplazar · Espacio: núcleo · . : dron ocioso</div>
+      <details class="help"><summary>Controles</summary>
+        <dl>
+          <dt>Clic izquierdo</dt><dd>Seleccionar (arrastra para un recuadro, doble clic: todos los del mismo tipo)</dd>
+          <dt>Clic derecho</dt><dd>Orden: mover, minar un asteroide, atacar al enemigo, reparar un módulo</dd>
+          <dt>Ctrl + clic derecho</dt><dd>Avanzar atacando lo que haya en el camino</dd>
+          <dt>Rueda / pellizco</dt><dd>Acercar y alejar</dd>
+          <dt>Clic central o Alt + arrastrar</dt><dd>Girar e inclinar la galaxia en 3D (también Z / X / C / V)</dd>
+          <dt>Flechas o bordes</dt><dd>Desplazar la cámara · clic en el minimapa para saltar</dd>
+          <dt>Espacio</dt><dd>Volver al Núcleo · <b>.</b> busca un dron ocioso</dd>
+          <dt>Ctrl + 1…9</dt><dd>Guardar grupo · 1…9 para recuperarlo</dd>
+          <dt>P</dt><dd>Pausa</dd>
+        </dl>
+      </details>
+      <div class="tip" id="tip"></div>
+      <div class="hover-label" id="hover"></div>
       <div class="toasts"></div>
       <div class="placing" id="placing"></div>
     `;
@@ -71,6 +111,21 @@ export class Hud {
       this.el[id] = this.root.querySelector('#' + id)!;
     }
     this.toasts = this.root.querySelector('.toasts')!;
+    this.tip = this.root.querySelector('#tip')!;
+    this.hoverLabel = this.root.querySelector('#hover')!;
+    this.tutorial = new Tutorial(this.root);
+    this.el.cmds.addEventListener('mouseover', e => {
+      const b = (e.target as HTMLElement).closest('button');
+      const btn = b ? this.buttons[Number(b.dataset.i)] : null;
+      if (!b || !btn) { this.tip.classList.remove('show'); return; }
+      this.tip.innerHTML = `<h4>${btn.glyph ? `<i>${btn.glyph}</i>` : ''}${btn.label} <kbd>${btn.key === 'Backspace' ? '⌫' : btn.key}</kbd></h4>
+        ${btn.help ? `<p>${btn.help}</p>` : ''}<div class="tip-cost">${btn.sub}</div>${btn.why ? `<em>${btn.why}</em>` : ''}`;
+      const r = b.getBoundingClientRect();
+      this.tip.style.left = `${Math.min(window.innerWidth - 300, r.left)}px`;
+      this.tip.style.bottom = `${window.innerHeight - r.top + 8}px`;
+      this.tip.classList.add('show');
+    });
+    this.el.cmds.addEventListener('mouseleave', () => this.tip.classList.remove('show'));
     this.mini = this.root.querySelector('.minimap canvas')!;
     this.mctx = this.mini.getContext('2d')!;
     this.mini.addEventListener('pointerdown', e => this.onMinimap(e));
@@ -147,8 +202,10 @@ export class Hud {
       ? `${MODULES[this.input.ui.buildMode].name}: ${this.input.placeReason() || 'clic para acoplar'} · Shift: colocar varios · Esc / clic derecho: cancelar`
       : '';
     this.el.placing.classList.toggle('show', !!this.input.ui.buildMode);
+    this.highlight = this.tutorial.update(s, this.side, this.input.ui.selected);
     this.updateSelection(s);
     this.updateButtons(s);
+    this.updateHover(s);
     this.drawMinimap(s);
     this.drawOverlay(s);
   }
@@ -163,15 +220,19 @@ export class Hud {
     const sel = this.selection(s);
     let html = '';
     if (sel.length === 0) {
-      html = `<div class="empty">Selecciona drones, naves o módulos de tu estación.</div>`;
+      html = `<div class="empty"><b>Nada seleccionado.</b><br>Arrastra un recuadro sobre tus drones (cian) o haz clic en un módulo de tu estación para ver qué puede hacer.</div>`;
     } else if (sel.length === 1) {
       const e = sel[0];
       if (e.kind === 'unit') {
         const d = UNITS[e.type];
         const task = e.order.kind === 'gather' ? (e.carry ? `Minando ${e.carry.res === 'lumen' ? 'Lumens' : 'metal'} (${Math.floor(e.carry.amount)})` : 'Minando')
           : e.order.kind === 'build' ? 'Ensamblando' : e.order.kind === 'attack' ? 'Atacando' : e.order.kind === 'move' ? 'En ruta' : 'En espera';
+        const hint = e.side !== this.side ? 'Unidad enemiga: selecciona tus tropas y haz clic derecho sobre ella para atacarla.'
+          : e.type === 'drone' ? 'Clic derecho en un asteroide para minar · elige un módulo a la derecha para construir · clic derecho en un módulo dañado para repararlo.'
+          : UNITS[e.type].cls === 'robot' ? 'Clic derecho sobre un planeta para conquistarlo, o sobre un enemigo para atacarlo.'
+          : 'Clic derecho sobre un enemigo para atacar · Ctrl+clic derecho para avanzar atacando.';
         html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, `
-          <div class="stats"><span>Ataque ${d.damage}</span><span>Alcance ${d.range}</span><span>Velocidad ${d.speed}</span><span>${task}</span></div>`);
+          <div class="stats"><span>Ataque ${d.damage}</span><span>Alcance ${d.range}</span><span>Velocidad ${d.speed}</span><span>${task}</span></div>`, hint);
       } else if (e.kind === 'module') {
         const d = MODULES[e.type];
         let extra = '';
@@ -182,9 +243,14 @@ export class Hud {
           <div class="progress"><i style="width:${(q.progress / q.total) * 100}%"></i><span>${Math.ceil(q.total - q.progress)} s</span></div>`;
         }
         if (e.type === 'beacon' && e.built >= 1) extra += `<div class="stats"><span>Quórum: ${s.players[e.side].beaconLedgers}/30 ledgers</span></div>`;
-        html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, extra);
+        const hint = e.side !== this.side ? 'Módulo enemigo: los robots le hacen el doble de daño.'
+          : e.built < 1 ? 'En ensamblaje: selecciona drones y haz clic derecho aquí para acelerarlo.'
+          : MODULES[e.type].trains.length ? 'Pulsa un botón de la derecha para fabricar. Clic derecho en el mapa fija el punto de reunión de lo que salga.'
+          : e.type === 'lab' ? 'Ya puedes avanzar de era: selecciona el Núcleo y pulsa «Avanzar».' : MODULE_HELP[e.type];
+        html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, extra, hint);
       } else if (e.kind === 'asteroid') {
-        html = this.card(e.res === 'lumen' ? 'Asteroide de Lumen' : 'Asteroide metálico', `Quedan ${Math.floor(e.amount)} unidades.`, 0, 0, -1, '');
+        html = this.card(e.res === 'lumen' ? 'Asteroide de Lumen' : 'Asteroide metálico', `Quedan ${Math.floor(e.amount)} unidades.`, 0, 0, -1, '',
+          'Selecciona drones y haz clic derecho sobre él para minarlo.');
       } else {
         const owner = e.owner === -1 ? 'Neutral' : e.owner === this.side ? 'Tuyo' : 'Del rival';
         html = this.card(`Planeta ${e.name}`, `${owner}. Lleva robots (Mecha o Titán) a su órbita para conquistarlo: paga Lumens cada ledger.`, 0, 0, e.owner, `
@@ -193,14 +259,17 @@ export class Hud {
     } else {
       const counts = new Map<string, number>();
       for (const e of sel) if (e.kind === 'unit') counts.set(UNITS[e.type].name, (counts.get(UNITS[e.type].name) ?? 0) + 1);
-      html = `<div class="multi">${[...counts].map(([n, c]) => `<span><b>${c}</b> ${n}</span>`).join('')}</div>`;
+      html = `<div class="multi">${[...counts].map(([n, c]) => `<span><b>${c}</b> ${n}</span>`).join('')}</div>
+        <div class="hint">${sel.every(e => e.kind === 'unit' && e.type === 'drone')
+          ? 'Clic derecho en un asteroide para minar · elige un módulo a la derecha y colócalo en un hexágono verde para construir.'
+          : 'Clic derecho: mover o atacar · Ctrl+clic derecho: avanzar atacando · Ctrl+1…9: guardar este grupo.'}</div>`;
     }
     if (this.el.sel.innerHTML !== html) this.el.sel.innerHTML = html;
   }
 
-  private card(name: string, desc: string, hp: number, max: number, side: number, extra: string) {
+  private card(name: string, desc: string, hp: number, max: number, side: number, extra: string, hint = '') {
     const hpBar = max > 0 ? `<div class="hp"><i style="width:${(hp / max) * 100}%"></i><span>${Math.ceil(hp)} / ${max}</span></div>` : '';
-    return `<div class="card side-${side}"><h3>${name}</h3><p>${desc}</p>${hpBar}${extra}</div>`;
+    return `<div class="card side-${side}"><h3>${name}</h3><p>${desc}</p>${hpBar}${extra}${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
   }
 
   private updateButtons(s: SimState) {
@@ -216,7 +285,7 @@ export class Hud {
         const eraOk = pl.era >= d.era;
         const afford = canAfford(pl.res, d.cost);
         buttons.push({
-          key: d.hotkey, label: d.name, sub: costText(d.cost), cost: d.cost, enabled: eraOk && afford,
+          key: d.hotkey, label: d.name, sub: costText(d.cost), cost: d.cost, enabled: eraOk && afford, glyph: MODULE_GLYPH[t], help: MODULE_HELP[t],
           why: !eraOk ? `Era ${ERAS[d.era].name}` : !afford ? 'Faltan recursos' : '',
           run: () => this.input.startBuild(t),
         });
@@ -229,6 +298,7 @@ export class Hud {
         const afford = canAfford(pl.res, d.cost);
         buttons.push({
           key: d.hotkey, label: d.name, sub: costText(d.cost), enabled: eraOk && afford && mod.queue.length < 6,
+          glyph: UNIT_GLYPH[t as UnitType], help: UNIT_HELP[t as UnitType],
           why: !eraOk ? `Era ${ERAS[d.era].name}` : !afford ? 'Faltan recursos' : '',
           run: () => this.send({ kind: 'train', module: mod.id, unit: t }),
         });
@@ -239,7 +309,8 @@ export class Hud {
         const lab = hasBuilt(s, this.side, 'lab');
         const busy = mod.queue.some(q => q.item === 'era');
         buttons.push({
-          key: 'U', label: `Avanzar a ${ERAS[next].name}`, sub: costText(up.cost),
+          key: 'U', label: `Avanzar a ${ERAS[next].name}`, sub: costText(up.cost), glyph: '⬆',
+          help: `Investiga la era ${ERAS[next].name} (${up.time} s): «${ERAS[next].lema}». Desbloquea módulos y unidades nuevas.`,
           enabled: lab && !busy && canAfford(pl.res, up.cost),
           why: !lab ? 'Requiere Laboratorio Soroban' : busy ? 'Investigando' : !canAfford(pl.res, up.cost) ? 'Faltan recursos' : '',
           run: () => this.send({ kind: 'era', module: mod.id }),
@@ -250,13 +321,44 @@ export class Hud {
     if (mod && mod.built < 1) buttons.push({ key: 'Backspace', label: 'Cancelar ensamblaje', sub: 'devuelve 75 %', enabled: true, run: () => this.send({ kind: 'cancel', module: mod.id }) });
 
     this.buttons = buttons;
-    const key = buttons.map(b => `${b.key}${b.label}${b.enabled}${b.why}`).join('|');
+    const key = buttons.map(b => `${b.key}${b.label}${b.enabled}${b.why}`).join('|') + (this.highlight ?? '');
     if (key === this.buttonsKey) return;
     this.buttonsKey = key;
     this.el.cmds.innerHTML = buttons.map((b, i) => `
-      <button data-i="${i}" class="${b.enabled ? '' : 'off'}" title="${b.why ?? ''}">
-        <kbd>${b.key === 'Backspace' ? '⌫' : b.key}</kbd><b>${b.label}</b><small>${b.sub}</small>${b.why ? `<em>${b.why}</em>` : ''}
+      <button data-i="${i}" class="${b.enabled ? '' : 'off'} ${b.key === this.highlight ? 'hl' : ''}">
+        <kbd>${b.key === 'Backspace' ? '⌫' : b.key}</kbd>${b.glyph ? `<i class="g">${b.glyph}</i>` : ''}<b>${b.label}</b><small>${b.sub}</small>${b.why ? `<em>${b.why}</em>` : ''}
       </button>`).join('');
+  }
+
+  // etiqueta junto al cursor: qué es lo que hay debajo y qué hacer con ello
+  private updateHover(s: SimState) {
+    const m = this.input.mousePos;
+    const e = this.input.ui.buildMode || this.input.ui.dragRect ? null : this.input.pick(m.x, m.y);
+    if (!e) { this.hoverLabel.classList.remove('show'); return; }
+    const hasDrones = this.input.selectedUnits().some(u => u.type === 'drone');
+    const hasArmy = this.input.selectedUnits().some(u => u.type !== 'drone');
+    let name = '', act = '', cls = '';
+    if (e.kind === 'asteroid') {
+      name = e.res === 'lumen' ? 'Asteroide de Lumen' : 'Asteroide metálico';
+      act = hasDrones ? 'Clic derecho: minar' : 'Selecciona drones para minarlo';
+      cls = e.res === 'lumen' ? 'lumen' : 'metal';
+    } else if (e.kind === 'planet') {
+      name = `Planeta ${e.name}` + (e.owner === this.side ? ' (tuyo)' : e.owner === -1 ? ' (neutral)' : ' (rival)');
+      act = 'Conquístalo con robots en su órbita';
+    } else if (e.kind === 'unit') {
+      name = UNITS[e.type].name;
+      cls = e.side === this.side ? 'ally' : 'enemy';
+      act = e.side !== this.side && (hasArmy || hasDrones) ? 'Clic derecho: atacar' : '';
+    } else {
+      name = MODULES[e.type].name + (e.built < 1 ? ` (${Math.floor(e.built * 100)} %)` : '');
+      cls = e.side === this.side ? 'ally' : 'enemy';
+      act = e.side !== this.side ? (hasArmy || hasDrones ? 'Clic derecho: atacar' : '')
+        : hasDrones && (e.built < 1 || e.hp < e.maxHp) ? 'Clic derecho: ensamblar / reparar' : '';
+    }
+    this.hoverLabel.className = `hover-label show ${cls}`;
+    this.hoverLabel.innerHTML = `<b>${name}</b>${act ? `<span>${act}</span>` : ''}`;
+    this.hoverLabel.style.left = `${m.x + 16}px`;
+    this.hoverLabel.style.top = `${m.y + 14}px`;
   }
 
   // ---------- minimapa ----------

@@ -68,7 +68,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .multi span { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
 .multi b { color: var(--stellar); }
 
-.commands { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 80px; gap: 6px; align-content: start; }
+.commands { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: minmax(80px, auto); gap: 6px; align-content: start; }
 .commands button { position: relative; text-align: left; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
   padding: 6px 8px; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
 .commands button:hover { border-color: var(--stellar); background: rgba(253,218,36,0.08); }
@@ -80,7 +80,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .c-l { color: var(--stellar); } .c-m { color: #d0946a; } .c-e { color: #5cc8ff; }
 .c-l::before { content: '◆'; font-size: 9px; margin-right: 2px; } .c-m::before { content: '◆'; font-size: 9px; margin-right: 2px; } .c-e::before { content: '●'; font-size: 8px; margin-right: 2px; }
 
-.help { position: absolute; right: 12px; top: 54px; max-width: 380px; font-size: 11px; color: rgba(255,255,255,0.45); text-align: right; line-height: 1.5; pointer-events: none; }
 .toasts { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
 .toast { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--violet); padding: 8px 14px; border-radius: 6px; font-size: 13px; transition: opacity 0.5s, transform 0.5s; }
 .toast.good { border-left-color: var(--stellar); } .toast.bad { border-left-color: var(--bad); }
@@ -101,7 +100,66 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .opts button.on { border-color: var(--stellar); color: var(--stellar); background: rgba(253,218,36,0.08); }
 .play, .endscreen button { background: var(--stellar); color: #0a0a0a; font-weight: 800; font-size: 16px; padding: 14px 42px; border: none; letter-spacing: 0.06em; }
 .play:hover, .endscreen button:hover { filter: brightness(1.1); box-shadow: 0 0 30px rgba(253,218,36,0.5); }
-.hint { color: var(--muted); font-size: 12px; margin-top: 22px; }
+.footnote { color: var(--muted); font-size: 12px; margin-top: 22px; }
 .endscreen h1 { font-size: 54px; margin: 0 0 8px; letter-spacing: 0.1em; }
 .endscreen .win h1 { color: var(--stellar); } .endscreen .lose h1 { color: var(--enemy); }
 .endscreen .muted { color: var(--muted); font-size: 13px; }
+
+/* ---------- ayuda: tutorial, tooltips, etiquetas ---------- */
+.tutorial { position: absolute; top: 56px; left: 12px; width: 300px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; backdrop-filter: blur(6px); }
+.tut-head { display: flex; align-items: center; gap: 8px; }
+.tut-head b { color: var(--stellar); letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; }
+.tut-head span { font-family: var(--mono); color: var(--muted); font-size: 11px; }
+.tut-toggle { margin-left: auto; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 5px; font: inherit; font-size: 11px; padding: 2px 8px; cursor: pointer; }
+.tutorial ol { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.tutorial li { color: var(--muted); }
+.tutorial li.done { color: #5d6377; text-decoration: line-through; }
+.tutorial li.done::marker { content: '✓  '; color: var(--good); }
+.tutorial li.now { color: var(--ink); }
+.tutorial li.now > span { font-weight: 700; color: var(--stellar); }
+.tutorial li p { margin: 4px 0 6px; line-height: 1.45; color: #d6d9e6; background: rgba(253,218,36,0.06); border-left: 2px solid var(--stellar); padding: 6px 8px; border-radius: 0 6px 6px 0; }
+.tut-mini { margin-top: 6px; color: var(--stellar); }
+
+.hint { margin-top: 8px; font-size: 12px; color: #cfe9ff; background: rgba(46,230,255,0.07); border: 1px solid rgba(46,230,255,0.25); border-radius: 6px; padding: 6px 9px; line-height: 1.4; }
+.hint::before { content: '¿Qué hago? '; color: var(--ally); font-weight: 700; }
+.selection .empty b { color: var(--ink); }
+
+.commands .g { font-style: normal; font-size: 18px; line-height: 1; color: var(--ally); font-family: "Apple Symbols", "Segoe UI Symbol", sans-serif; }
+.commands button.hl { border-color: var(--stellar); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(253,218,36,0.0); } 50% { box-shadow: 0 0 0 4px rgba(253,218,36,0.35), 0 0 22px rgba(253,218,36,0.4); } }
+
+.tip { position: fixed; width: 290px; background: rgba(8,10,20,0.96); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.12s, transform 0.12s; z-index: 5; }
+.tip.show { opacity: 1; transform: none; }
+.tip h4 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.tip h4 i { font-style: normal; color: var(--ally); font-size: 18px; }
+.tip h4 kbd { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+.tip p { margin: 0 0 8px; color: #c9cddc; line-height: 1.45; }
+.tip-cost { font-family: var(--mono); }
+.tip em { display: block; margin-top: 6px; color: var(--bad); font-style: normal; }
+
+.hover-label { position: fixed; pointer-events: none; background: rgba(8,10,20,0.9); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; display: none; flex-direction: column; gap: 1px; z-index: 4; }
+.hover-label.show { display: flex; }
+.hover-label span { color: var(--muted); font-size: 11px; }
+.hover-label.ally b { color: var(--ally); } .hover-label.enemy b { color: var(--enemy); }
+.hover-label.lumen b { color: var(--stellar); } .hover-label.metal b { color: #d0946a; }
+
+details.help { position: absolute; right: 12px; top: 54px; width: 340px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
+details.help summary { cursor: pointer; padding: 7px 12px; color: var(--muted); list-style: none; text-align: right; }
+details.help summary::before { content: '⌨  '; }
+details.help[open] summary { color: var(--ink); border-bottom: 1px solid var(--line); }
+details.help dl { margin: 0; padding: 8px 12px 10px; display: grid; grid-template-columns: 120px 1fr; gap: 6px 10px; }
+details.help dt { color: var(--stellar); font-weight: 600; }
+details.help dd { margin: 0; color: #c9cddc; }
+
+[data-tip] { position: relative; cursor: help; }
+[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: 30px; left: 0; white-space: nowrap; background: rgba(8,10,20,0.96); border: 1px solid var(--line); padding: 5px 9px; border-radius: 6px; font-family: 'Inter Tight', sans-serif; font-size: 12px; color: var(--ink); z-index: 6; }
+
+/* lobby: cómo jugar */
+.lobby-card { max-width: 860px !important; }
+.howto { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 24px; text-align: left; }
+.howto div { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: rgba(255,255,255,0.02); }
+.howto i { font-style: normal; font-size: 22px; color: var(--ally); display: block; margin-bottom: 6px; font-family: "Apple Symbols", "Segoe UI Symbol", sans-serif; }
+.howto b { display: block; font-size: 13px; margin-bottom: 4px; }
+.howto p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.howto .gold { color: var(--stellar); } .howto .cu { color: #d0946a; } .howto .cy { color: var(--ally); } .howto .pk { color: var(--enemy); }
+details.help:not([open]) { width: auto; }

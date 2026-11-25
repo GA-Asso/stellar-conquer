@@ -24,6 +24,12 @@ function showLobby() {
     <div class="lobby-card">
       <div class="title"><span class="logo big"></span><h1>STELLAR <b>CONQUER</b></h1></div>
       <p class="tag">Estrategia en tiempo real sobre el ecosistema Stellar.<br>Mina Lumens, acopla tu estación módulo a módulo, conquista planetas y derriba el Núcleo rival.</p>
+      <div class="howto">
+        <div><i>◆</i><b>1 · Recolecta</b><p>Selecciona tus drones <span class="cy">(cian)</span> y haz clic derecho en asteroides <span class="gold">dorados (Lumens)</span> o <span class="cu">cobrizos (metal)</span>.</p></div>
+        <div><i>⬡</i><b>2 · Acopla módulos</b><p>Con un dron elige un módulo y colócalo en un hexágono verde pegado a tu estación: hábitats, paneles, hangares…</p></div>
+        <div><i>➤</i><b>3 · Arma tu flota</b><p>Hangar = naves. Forja = robots, los únicos que conquistan planetas. Cada planeta paga Lumens en cada ledger.</p></div>
+        <div><i>✦</i><b>4 · Gana</b><p>Destruye el Núcleo <span class="pk">rosa</span> del rival, o construye el Faro de Consenso y haz que resista 30 ledgers.</p></div>
+      </div>
       <div class="diff">
         <span>Dificultad del rival</span>
         <div class="opts">
@@ -31,7 +37,7 @@ function showLobby() {
         </div>
       </div>
       <button class="play">Despegar</button>
-      <p class="hint">Gana destruyendo el Núcleo Estelar enemigo, o si tu Faro de Consenso resiste 30 ledgers.</p>
+      <p class="footnote">Una guía de objetivos te acompaña durante la partida (arriba a la izquierda). Pasa el ratón sobre cualquier botón para ver para qué sirve.</p>
     </div>`;
   let diff: Difficulty = 'normal';
   d.querySelectorAll<HTMLButtonElement>('.opts button').forEach(b => b.addEventListener('click', () => {
@@ -63,7 +69,7 @@ function start(diff: Difficulty) {
   const core = coreOf(sim, LOCAL)!;
   space.rig.lookAt(core.pos.x + 20, core.pos.z - 20);
   input.ui.selected.add(core.id);
-  hud.toast('Selecciona tus drones y mina los asteroides dorados (Lumens) y grises (metal).', 'info');
+  hud.toast('Selecciona tus drones y mina los asteroides dorados (Lumens) y cobrizos (metal).', 'info');
 }
 
 // ?vitrina: arma al instante una estación con todos los módulos y unidades, para revisar diseños
