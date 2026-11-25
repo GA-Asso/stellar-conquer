@@ -174,7 +174,7 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.85, 0.55, 0.72);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.35, 1.0);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 

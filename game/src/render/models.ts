@@ -27,9 +27,9 @@ export function mats(side: Owner): Mats {
   m = {
     hull: new THREE.MeshStandardMaterial({ color: 0xe8ebf2, metalness: 0.55, roughness: 0.35 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x1b1f2e, metalness: 0.7, roughness: 0.4 }),
-    trim: new THREE.MeshStandardMaterial({ color: c, metalness: 0.4, roughness: 0.3, emissive: c, emissiveIntensity: 0.35 }),
+    trim: new THREE.MeshStandardMaterial({ color: c, metalness: 0.4, roughness: 0.3, emissive: c, emissiveIntensity: 0.15 }),
     // color > 1 para que el bloom lo haga brillar
-    glow: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(2.6) }),
+    glow: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.6) }),
     glass: new THREE.MeshStandardMaterial({ color: 0x7fd8ff, metalness: 0.1, roughness: 0.05, emissive: 0x2a6aff, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }),
     panel: new THREE.MeshStandardMaterial({ color: 0x14204a, metalness: 0.9, roughness: 0.2, emissive: 0x0b1f6b, emissiveIntensity: 0.5 }),
   };
@@ -69,7 +69,7 @@ export function buildModule(type: ModuleType, side: Owner): { group: THREE.Group
       g.add(at(sphere(2.2, m.glow), 0, 11, 0));
       // anillo orbital inclinado y dos barras: un guiño al logo de Stellar
       const ringPivot = at(new THREE.Group(), 0, 11, 0);
-      const ring = torus(7.5, 0.45, m.glow, 64);
+      const ring = torus(7.5, 0.3, m.glow, 64);
       ring.rotation.x = Math.PI / 2 - 0.42;
       ringPivot.add(ring);
       g.add(ringPivot);
@@ -348,7 +348,7 @@ export function buildAsteroid(kind: AsteroidKind, radius: number, seed: number):
   g.add(new THREE.Mesh(geo, rock));
   if (kind === 'lumen') {
     const crystal = new THREE.MeshStandardMaterial({
-      color: 0xfff4b0, emissive: new THREE.Color('#fdda24'), emissiveIntensity: 1.6, roughness: 0.2, metalness: 0.1, flatShading: true,
+      color: 0xfff4b0, emissive: new THREE.Color('#fdda24'), emissiveIntensity: 1.3, roughness: 0.2, metalness: 0.1, flatShading: true,
     });
     for (let i = 0; i < 4; i++) {
       const c = new THREE.Mesh(new THREE.OctahedronGeometry(radius * (0.3 + rnd() * 0.25), 0), crystal);

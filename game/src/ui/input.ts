@@ -19,7 +19,7 @@ export interface UiState {
 
 export class Input {
   ui: UiState = { selected: new Set(), buildMode: null, hoverHex: null, groups: new Map(), dragRect: null, ping: null };
-  private mouse = { x: 0, y: 0, inside: false };
+  private mouse = { x: -1, y: -1, inside: false, moved: false };
   private keys = new Set<string>();
   private down: { x: number; y: number; button: number; alt: boolean } | null = null;
   private lastClick = { t: 0, id: -1 };
@@ -106,6 +106,8 @@ export class Input {
   private onMove(e: PointerEvent) {
     const dx = e.clientX - this.mouse.x, dy = e.clientY - this.mouse.y;
     this.mouse.x = e.clientX; this.mouse.y = e.clientY;
+    this.mouse.moved = true;
+    this.mouse.inside = e.target === this.space.renderer.domElement;
     if (this.down?.button === 1) {
       this.space.rig.rotate(-dx * 0.006, dy * 0.004);
       return;
@@ -133,7 +135,7 @@ export class Input {
     if (e.shiftKey) { this.space.rig.rotate(e.deltaY * 0.004, 0); return; }
     // pellizco del trackpad (ctrlKey) o rueda: zoom; desplazamiento horizontal del trackpad: giro
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey) { this.space.rig.rotate(e.deltaX * 0.004, 0); return; }
-    const k = e.ctrlKey ? 0.01 : 0.0012;
+    const k = e.ctrlKey ? 0.01 : 0.002;
     this.space.rig.zoom(Math.exp(e.deltaY * k));
   }
 
@@ -284,6 +286,9 @@ export class Input {
       return;
     }
     if (k === '.') { this.selectIdleDrone(); return; }
+    // un toque de Z/X/C/V da un paso de giro; mantenerla gira de forma continua en update()
+    const tap: Record<string, [number, number]> = { z: [-0.12, 0], x: [0.12, 0], c: [0, 0.08], v: [0, -0.08] };
+    if (tap[k] && !e.repeat) { this.space.rig.rotate(tap[k][0], tap[k][1]); return; }
     if (k.length === 1 && this.onHotkey(k.toUpperCase())) e.preventDefault();
   }
 
@@ -311,7 +316,7 @@ export class Input {
     if (this.keys.has('c')) rig.rotate(0, 1.2 * dt);
     if (this.keys.has('v')) rig.rotate(0, -1.2 * dt);
     // desplazamiento por los bordes de la pantalla
-    if (this.mouse.inside && !this.down) {
+    if (this.mouse.inside && this.mouse.moved && !this.down && document.hasFocus()) {
       const m = 6, w = window.innerWidth, h = window.innerHeight;
       if (this.mouse.x <= m) rig.pan(-sp, 0);
       if (this.mouse.x >= w - m) rig.pan(sp, 0);

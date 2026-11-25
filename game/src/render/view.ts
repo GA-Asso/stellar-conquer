@@ -268,7 +268,7 @@ export class GameView {
 
   private addRing(id: number, side: Side | -1): THREE.Mesh {
     const mesh = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({
-      color: SIDE_COLORS[side].clone().multiplyScalar(2), transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false,
+      color: SIDE_COLORS[side].clone().multiplyScalar(0.9), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false,
     }));
     mesh.rotation.x = -Math.PI / 2;
     this.space.scene.add(mesh);
