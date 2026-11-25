@@ -181,7 +181,7 @@ export function canPlace(s: SimState, side: Side, type: ModuleType, hex: Hex): P
   for (const m of modules(s)) occupied.set(hexKey(m.hex), m);
   if (occupied.has(hexKey(hex))) return { ok: false, reason: 'Celda ocupada' };
   for (const e of s.entities.values()) {
-    if (e.kind === 'asteroid' && dist(e.pos, pos) < e.radius + 8) return { ok: false, reason: 'Hay asteroides' };
+    if (e.kind === 'asteroid' && dist(e.pos, pos) < e.radius + 11) return { ok: false, reason: 'Hay asteroides' };
     if (e.kind === 'planet' && dist(e.pos, pos) < e.radius + 12) return { ok: false, reason: 'Muy cerca de un planeta' };
   }
   let parent: Module | null = null;
@@ -332,6 +332,8 @@ export function step(s: SimState, cmds: SideCommand[] = []) {
   s.events = [];
   if (s.winner !== null) return;
   for (const c of cmds) applyCommand(s, c.side, c.cmd);
+  obstacles = [];
+  for (const e of s.entities.values()) if (e.kind === 'asteroid' || e.kind === 'planet') obstacles.push(e);
 
   for (const e of [...s.entities.values()]) {
     if (!s.entities.has(e.id)) continue;
@@ -384,15 +386,43 @@ function reap(s: SimState) {
   }
 }
 
+let obstacles: (Asteroid | Planet)[] = [];
+
 function moveTowards(u: Unit, to: Vec, stop: number): boolean {
   const dx = to.x - u.pos.x, dz = to.z - u.pos.z;
   const d = Math.hypot(dx, dz);
-  if (d <= stop) return true;
-  const sp = UNITS[u.type].speed * DT;
-  const k = Math.min(sp, d - stop) / d;
-  u.pos.x += dx * k;
-  u.pos.z += dz * k;
-  u.facing = Math.atan2(dx, dz);
+  // tolerancia: la separación entre unidades puede alejarla unas décimas del punto exacto
+  if (d <= stop + 0.4) return true;
+  let nx = dx / d, nz = dz / d;
+  // rodea el obstáculo más cercano que corte el camino (módulos, asteroides, planetas)
+  const ur = UNITS[u.type].radius;
+  const look = Math.min(d, 30);
+  let block: { t: number; side: number; r: number; ox: number; oz: number } | null = null;
+  for (const o of obstacles) {
+    const r = radiusOf(o) + ur + 0.8;
+    const ox = o.pos.x - u.pos.x, oz = o.pos.z - u.pos.z;
+    if (Math.abs(o.pos.x - to.x) + Math.abs(o.pos.z - to.z) < 0.5) continue;
+    const t = ox * nx + oz * nz;
+    if (t < -r || t > look + r) continue;
+    const perp = ox * nz - oz * nx;
+    if (Math.abs(perp) >= r) continue;
+    // el destino está dentro del obstáculo (p. ej. un módulo a ensamblar): no se esquiva
+    if (Math.hypot(o.pos.x - to.x, o.pos.z - to.z) < r + stop) continue;
+    if (!block || t < block.t) block = { t, side: perp >= 0 ? 1 : -1, r, ox, oz };
+  }
+  if (block) {
+    // tangente al círculo del obstáculo, del lado contrario a donde está su centro
+    const ol = Math.hypot(block.ox, block.oz) || 1;
+    const tx = -block.oz / ol * block.side, tz = block.ox / ol * block.side;
+    const w = ol < block.r + 2 ? 1 : 0.8;
+    nx = nx * (1 - w) + tx * w; nz = nz * (1 - w) + tz * w;
+    const l = Math.hypot(nx, nz) || 1;
+    nx /= l; nz /= l;
+  }
+  const sp = Math.min(UNITS[u.type].speed * DT, d - stop);
+  u.pos.x += nx * sp;
+  u.pos.z += nz * sp;
+  u.facing = Math.atan2(nx, nz);
   u.pos.x = Math.max(-MAP_HALF, Math.min(MAP_HALF, u.pos.x));
   u.pos.z = Math.max(-MAP_HALF, Math.min(MAP_HALF, u.pos.z));
   return false;
@@ -625,8 +655,8 @@ function separate(s: SimState) {
       b.pos.x += nx * push; b.pos.z += nz * push;
     }
   }
-  for (const e of s.entities.values()) {
-    if (e.kind === 'unit') continue;
+  // las unidades vuelan por encima de la estación: solo asteroides y planetas estorban
+  for (const e of obstacles) {
     const re = radiusOf(e);
     for (const u of us) {
       // un robot cerca de un planeta no se empuja más allá: aterriza en su órbita baja
@@ -635,8 +665,11 @@ function separate(s: SimState) {
       const d2 = dx * dx + dz * dz;
       if (d2 >= min * min) continue;
       const d = Math.sqrt(d2) || 0.01;
-      u.pos.x = e.pos.x + (dx / d) * min;
-      u.pos.z = e.pos.z + (dz / d) * min;
+      // además de sacarla, la desliza por el borde para que no quede trabada de frente
+      const slide = u.id % 2 === 0 ? 0.25 : -0.25;
+      const nx = dx / d, nz = dz / d;
+      u.pos.x = e.pos.x + nx * min - nz * slide;
+      u.pos.z = e.pos.z + nz * min + nx * slide;
     }
   }
 }

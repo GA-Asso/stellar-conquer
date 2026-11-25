@@ -150,7 +150,7 @@ export const ERA_UP: Record<2 | 3 | 4, { cost: Res; time: number }> = {
 export const GATHER = {
   perTrip: 10,
   // unidades por segundo
-  rate: 1.1,
+  rate: 1.6,
   reach: 4,
   labBonus: 0.2,
 };
