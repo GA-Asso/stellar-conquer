@@ -1,0 +1,121 @@
+// Tipos de la simulación. Nada aquí depende de Three.js: el render solo lee este estado.
+
+export type Side = 0 | 1;
+export type Owner = Side | -1;
+export type ResKey = 'lumens' | 'metal' | 'energy';
+export type Res = Record<ResKey, number>;
+
+export type UnitType = 'drone' | 'interceptor' | 'mecha' | 'frigate' | 'titan' | 'dreadnought';
+export type ModuleType = 'core' | 'habitat' | 'solar' | 'anchor' | 'hangar' | 'factory' | 'lab' | 'turret' | 'beacon';
+export type AsteroidKind = 'lumen' | 'metal';
+export type Era = 1 | 2 | 3 | 4;
+
+export interface Vec { x: number; z: number }
+export interface Hex { q: number; r: number }
+
+export type Order =
+  | { kind: 'idle' }
+  | { kind: 'move'; to: Vec; aggressive: boolean }
+  | { kind: 'attack'; target: number }
+  | { kind: 'gather'; target: number; phase: 'go' | 'mine' | 'return' }
+  | { kind: 'build'; target: number };
+
+export interface Unit {
+  id: number;
+  kind: 'unit';
+  type: UnitType;
+  side: Side;
+  pos: Vec;
+  facing: number;
+  hp: number;
+  maxHp: number;
+  order: Order;
+  carry: { res: AsteroidKind; amount: number } | null;
+  cooldown: number;
+  // última posición de destino de minería, para volver al campo cuando se agota un asteroide
+  lastField: Vec | null;
+}
+
+export interface QueueItem { item: UnitType | 'era'; progress: number; total: number }
+
+export interface Module {
+  id: number;
+  kind: 'module';
+  type: ModuleType;
+  side: Side;
+  hex: Hex;
+  pos: Vec;
+  hp: number;
+  maxHp: number;
+  // 0..1: progreso de ensamblaje. 1 = operativo
+  built: number;
+  // módulo al que está acoplado (para dibujar el pasillo). null en núcleo y anclas
+  parent: number | null;
+  queue: QueueItem[];
+  cooldown: number;
+  rally: Vec | null;
+}
+
+export interface Asteroid {
+  id: number;
+  kind: 'asteroid';
+  res: AsteroidKind;
+  pos: Vec;
+  amount: number;
+  radius: number;
+}
+
+export interface Planet {
+  id: number;
+  kind: 'planet';
+  name: string;
+  pos: Vec;
+  radius: number;
+  owner: Owner;
+  // -1..1: negativo avanza hacia el lado 1, positivo hacia el lado 0
+  capture: number;
+}
+
+export type Entity = Unit | Module | Asteroid | Planet;
+
+export interface Player {
+  side: Side;
+  res: Res;
+  era: Era;
+  alive: boolean;
+  // ledgers seguidos que el Faro de Consenso lleva en pie
+  beaconLedgers: number;
+}
+
+export type SimEvent =
+  | { kind: 'shot'; from: Vec; to: Vec; side: Side; weapon: 'laser' | 'plasma' | 'melee' }
+  | { kind: 'death'; pos: Vec; size: number; side: Owner }
+  | { kind: 'built'; id: number; side: Side }
+  | { kind: 'trained'; id: number; side: Side }
+  | { kind: 'ledger'; seq: number }
+  | { kind: 'captured'; planet: number; side: Side }
+  | { kind: 'era'; side: Side; era: Era };
+
+export type Command =
+  | { kind: 'move'; units: number[]; to: Vec; aggressive?: boolean }
+  | { kind: 'attack'; units: number[]; target: number }
+  | { kind: 'gather'; units: number[]; target: number }
+  | { kind: 'build'; units: number[]; module: ModuleType; hex: Hex }
+  | { kind: 'repair'; units: number[]; target: number }
+  | { kind: 'train'; module: number; unit: UnitType }
+  | { kind: 'era'; module: number }
+  | { kind: 'cancel'; module: number }
+  | { kind: 'rally'; module: number; to: Vec };
+
+export interface SimState {
+  tick: number;
+  ledger: number;
+  seed: number;
+  rngState: number;
+  nextId: number;
+  entities: Map<number, Entity>;
+  players: [Player, Player];
+  events: SimEvent[];
+  winner: Owner | null;
+  winReason: string;
+}
