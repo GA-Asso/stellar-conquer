@@ -303,6 +303,15 @@ export class GameView {
     this.ports.instanceMatrix.needsUpdate = true;
   }
 
+  dispose() {
+    for (const v of this.views.values()) this.space.scene.remove(v.root);
+    for (const c of this.connectors.values()) this.space.scene.remove(c);
+    for (const r of this.rings.values()) this.space.scene.remove(r);
+    this.views.clear(); this.connectors.clear(); this.rings.clear();
+    this.setGhost(null, null, false, []);
+    this.space.scene.remove(this.ports);
+  }
+
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado
   sideColor(side: Side): string { return '#' + mats(side).trim.color.getHexString(); }
 }
