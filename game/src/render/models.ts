@@ -491,48 +491,111 @@ export function buildUnit(type: UnitType, side: Owner): { group: THREE.Group; sp
   return { group: g, spins, engines };
 }
 
-// asteroides: icosaedros deformados y mate. Lumen: roca violeta oscura con cristales dorados.
-// Metal: roca cobriza con vetas de hierro. Ningún color coincide con los de los equipos.
+// asteroides: roca de superficie suave (ruido 3D, no vértices al azar) y mate.
+// Lumen: roca pizarra con una geoda de prismas hexagonales dorados que brillan por dentro.
+// Metal: roca gris parda con pepitas de mineral cobrizo incrustadas.
 const ASTEROID_MATS = {
-  lumenRock: new THREE.MeshStandardMaterial({ color: 0x2a2236, roughness: 1, metalness: 0, flatShading: true }),
+  lumenRock: new THREE.MeshStandardMaterial({ color: 0x3b3550, roughness: 0.95, metalness: 0, flatShading: true }),
   crystal: new THREE.MeshStandardMaterial({
-    color: 0xffe680, emissive: new THREE.Color('#fdda24'), emissiveIntensity: 0.75, roughness: 0.7, metalness: 0, flatShading: true,
+    color: 0xffd84a, emissive: new THREE.Color('#fdda24'), emissiveIntensity: 0.55, roughness: 0.25, metalness: 0,
+    transparent: true, opacity: 0.92, flatShading: true,
   }),
-  metalRock: new THREE.MeshStandardMaterial({ color: 0x6a4a36, roughness: 1, metalness: 0, flatShading: true }),
-  vein: new THREE.MeshStandardMaterial({ color: 0xb87a4b, roughness: 0.8, metalness: 0.15, flatShading: true }),
+  metalRock: new THREE.MeshStandardMaterial({ color: 0x5b524c, roughness: 0.95, metalness: 0, flatShading: true }),
+  ore: new THREE.MeshStandardMaterial({ color: 0xc8804c, roughness: 0.45, metalness: 0.55, flatShading: true }),
 };
+
+let haloTex: THREE.Texture | null = null;
+function halo(color: string, size: number): THREE.Sprite {
+  if (!haloTex) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x = c.getContext('2d')!;
+    const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,0.9)');
+    gr.addColorStop(0.35, 'rgba(255,255,255,0.25)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr;
+    x.fillRect(0, 0, 64, 64);
+    haloTex = new THREE.CanvasTexture(c);
+  }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: haloTex, color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  sp.scale.setScalar(size);
+  return sp;
+}
+
+function valueNoise(seed: number) {
+  const h = (x: number, y: number, z: number) => {
+    const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + seed * 13.13) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  return (x: number, y: number, z: number) => {
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+    const fx = x - ix, fy = y - iy, fz = z - iz;
+    const u = (t: number) => t * t * (3 - 2 * t);
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    const c = (dx: number, dy: number, dz: number) => h(ix + dx, iy + dy, iz + dz);
+    return lerp(
+      lerp(lerp(c(0, 0, 0), c(1, 0, 0), u(fx)), lerp(c(0, 1, 0), c(1, 1, 0), u(fx)), u(fy)),
+      lerp(lerp(c(0, 0, 1), c(1, 0, 1), u(fx)), lerp(c(0, 1, 1), c(1, 1, 1), u(fx)), u(fy)), u(fz));
+  };
+}
+
+function rockGeometry(radius: number, seed: number): THREE.BufferGeometry {
+  const geo = new THREE.IcosahedronGeometry(radius, 2);
+  const n = valueNoise(seed);
+  const p = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).normalize();
+    const k = 0.78 + 0.32 * n(v.x * 1.6 + 5, v.y * 1.6, v.z * 1.6) + 0.1 * n(v.x * 4.5, v.y * 4.5 + 9, v.z * 4.5);
+    p.setXYZ(i, v.x * radius * k, v.y * radius * k * 0.72, v.z * radius * k);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function crystal(h: number, r: number): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.1, h, 6), ASTEROID_MATS.crystal);
+  body.position.y = h / 2;
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(r, r * 1.8, 6), ASTEROID_MATS.crystal);
+  tip.position.y = h + r * 0.9;
+  g.add(body, tip);
+  return g;
+}
 
 export function buildAsteroid(kind: AsteroidKind, radius: number, seed: number): THREE.Group {
   let st = seed * 9301 + 49297;
   const rnd = () => { st = (st * 16807) % 2147483647; return st / 2147483647; };
-  const geo = new THREE.IcosahedronGeometry(radius, 1);
-  const p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const k = 0.75 + rnd() * 0.45;
-    p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.8, p.getZ(i) * k);
-  }
-  geo.computeVertexNormals();
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(geo, kind === 'lumen' ? ASTEROID_MATS.lumenRock : ASTEROID_MATS.metalRock));
+  g.add(new THREE.Mesh(rockGeometry(radius, seed), kind === 'lumen' ? ASTEROID_MATS.lumenRock : ASTEROID_MATS.metalRock));
   if (kind === 'lumen') {
-    for (let i = 0; i < 5; i++) {
-      const c = new THREE.Mesh(new THREE.OctahedronGeometry(radius * (0.25 + rnd() * 0.25), 0), ASTEROID_MATS.crystal);
-      c.scale.y = 2.4;
-      const a = rnd() * Math.PI * 2, e = rnd() * 0.8;
-      c.position.set(Math.cos(a) * radius * 0.55, radius * (0.3 + e * 0.4), Math.sin(a) * radius * 0.55);
-      c.rotation.set(rnd() - 0.5, rnd() * 3, rnd() - 0.5);
-      g.add(c);
+    // geoda: un racimo de prismas que nacen de un mismo punto en la cara superior
+    const cluster = new THREE.Group();
+    cluster.position.set((rnd() - 0.5) * radius * 0.5, radius * 0.45, (rnd() - 0.5) * radius * 0.5);
+    const n = 4 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n; i++) {
+      const c = crystal(radius * (0.5 + rnd() * 0.7), radius * (0.13 + rnd() * 0.08));
+      const a = (i / n) * Math.PI * 2 + rnd() * 0.6;
+      const tilt = i === 0 ? 0 : 0.35 + rnd() * 0.45;
+      c.rotation.set(Math.sin(a) * tilt, 0, -Math.cos(a) * tilt);
+      cluster.add(c);
     }
+    cluster.add(at(halo('#fdda24', radius * 3.2), 0, radius * 0.5, 0));
+    g.add(cluster);
   } else {
-    for (let i = 0; i < 4; i++) {
-      const c = new THREE.Mesh(new THREE.DodecahedronGeometry(radius * (0.22 + rnd() * 0.15), 0), ASTEROID_MATS.vein);
-      const a = rnd() * Math.PI * 2;
-      c.position.set(Math.cos(a) * radius * 0.65, radius * (0.1 + rnd() * 0.4), Math.sin(a) * radius * 0.65);
-      c.rotation.set(rnd(), rnd() * 3, rnd());
+    for (let i = 0; i < 5; i++) {
+      const c = new THREE.Mesh(new THREE.DodecahedronGeometry(radius * (0.16 + rnd() * 0.14), 0), ASTEROID_MATS.ore);
+      const a = rnd() * Math.PI * 2, e = rnd() * 0.9 - 0.2;
+      const d = radius * 0.78;
+      c.position.set(Math.cos(a) * d * Math.cos(e), Math.sin(e) * d * 0.72, Math.sin(a) * d * Math.cos(e));
+      c.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
       g.add(c);
     }
   }
-  g.rotation.set(rnd() * 0.6, rnd() * Math.PI * 2, rnd() * 0.6);
+  g.rotation.set((rnd() - 0.5) * 0.3, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.3);
   return g;
 }
 

@@ -333,7 +333,9 @@ export class Hud {
   // etiqueta junto al cursor: qué es lo que hay debajo y qué hacer con ello
   private updateHover(s: SimState) {
     const m = this.input.mousePos;
-    const e = this.input.ui.buildMode || this.input.ui.dragRect ? null : this.input.pick(m.x, m.y);
+    // solo cuando el cursor está sobre el espacio 3D, no sobre paneles ni el minimapa
+    const overWorld = document.elementFromPoint(m.x, m.y) === this.space.renderer.domElement;
+    const e = !overWorld || this.input.ui.buildMode || this.input.ui.dragRect ? null : this.input.pick(m.x, m.y);
     if (!e) { this.hoverLabel.classList.remove('show'); return; }
     const hasDrones = this.input.selectedUnits().some(u => u.type === 'drone');
     const hasArmy = this.input.selectedUnits().some(u => u.type !== 'drone');
