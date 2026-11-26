@@ -4,14 +4,19 @@ import * as THREE from 'three';
 import type { SpaceScene } from '../render/scene';
 import { buildUnit } from '../render/models';
 import { itemDef, type WorldState } from './economy';
-import { GALAXIES, NODES, galaxyOf, nodeWorldPos, type Galaxy, type WorldNode } from './ecosystem';
+import { CURATED_INNER, CURATED_SLUGS, GALAXIES, NODES, galaxyOf, nodeSlug, nodeWorldPos, type Galaxy, type WorldNode } from './ecosystem';
+import { STATUS_INFO, layoutAtlas, type RavenSnapshot, type Star } from './atlas';
 
-const SHIP_SPEED = 140;
+const SHIP_SPEED = 170;
 const ARRIVE = 22;
+const WORLD_HALF = 1500;
+const NEAR_LABELS = 10;
 
 export interface UniverseEvents {
   onNode(n: WorldNode | null): void;
   onGalaxy(g: Galaxy | null): void;
+  /** la nave llegó a un astro del atlas (o se alejó: null) */
+  onStar(s: Star | null): void;
 }
 
 interface NodeView { node: WorldNode; obj: THREE.Group; core: THREE.Mesh; ring: THREE.Mesh; label: HTMLDivElement; pos: THREE.Vector3 }
@@ -73,7 +78,7 @@ function buildGalaxy(g: Galaxy): THREE.Group {
 function buildNode(n: WorldNode): { obj: THREE.Group; core: THREE.Mesh; ring: THREE.Mesh } {
   const obj = new THREE.Group();
   const col = new THREE.Color(galaxyOf(n.galaxy).color);
-  const service = n.kind === 'dex' || n.kind === 'market' || n.kind === 'trade';
+  const service = n.kind === 'dex' || n.kind === 'market' || n.kind === 'trade' || n.kind === 'atlas';
   let geo: THREE.BufferGeometry;
   if (n.kind === 'frontier') geo = new THREE.OctahedronGeometry(9);
   else if (service) geo = new THREE.SphereGeometry(9, 24, 16);
@@ -110,12 +115,23 @@ export class Universe {
   private cleanup: (() => void)[] = [];
   private raycaster = new THREE.Raycaster();
   private prevBound: number;
+  private stars: Star[] = [];
+  private starMeshes: { mesh: THREE.InstancedMesh; kind: Star['kind']; ids: number[] }[] = [];
+  private nearLabels: HTMLDivElement[] = [];
+  private hoverLabel: HTMLDivElement;
+  private currentStar: Star | null = null;
   frozen = false;
 
-  constructor(private space: SpaceScene, private world: WorldState, host: HTMLElement, private ev: UniverseEvents) {
+  constructor(private space: SpaceScene, private world: WorldState, host: HTMLElement, private ev: UniverseEvents, private atlas: RavenSnapshot | null = null) {
     space.scene.add(this.root);
     this.prevBound = space.rig.bound;
-    space.rig.bound = 1000;
+    space.rig.bound = WORLD_HALF + 50;
+    if (atlas) {
+      const centers = Object.fromEntries(GALAXIES.map(g => [g.id, g.center])) as Record<string, [number, number]>;
+      const layout = layoutAtlas(atlas, centers, CURATED_INNER, CURATED_SLUGS);
+      this.stars = layout.stars;
+      for (const g of GALAXIES) if (layout.radius[g.id]) g.radius = Math.max(g.radius, layout.radius[g.id]);
+    }
     for (const g of GALAXIES) {
       const grp = buildGalaxy(g);
       this.galaxyGroups.push(grp);
@@ -141,6 +157,17 @@ export class Universe {
       this.nodes.push({ node: n, ...v, label, pos: v.obj.position.clone() });
     }
 
+    this.buildStars();
+    this.hoverLabel = document.createElement('div');
+    this.hoverLabel.className = 'u-hover';
+    this.labels.appendChild(this.hoverLabel);
+    for (let i = 0; i < NEAR_LABELS; i++) {
+      const el = document.createElement('div');
+      el.className = 'u-label k-star';
+      this.labels.appendChild(el);
+      this.nearLabels.push(el);
+    }
+
     const built = buildUnit('interceptor', 0);
     this.ship = built.group;
     this.ship.scale.setScalar(2.4);
@@ -151,6 +178,67 @@ export class Universe {
     space.rig.lookAt(0, 90);
     space.rig.zoom(1.2);
     this.bindInput();
+  }
+
+  /** astros del atlas: una malla instanciada por forma (proyectos esferas, socios diamantes) y anillos de auditoría */
+  private buildStars() {
+    if (!this.atlas || !this.stars.length) return;
+    const atlas = this.atlas;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+    const make = (kind: Star['kind'], geo: THREE.BufferGeometry) => {
+      const list = this.stars.filter(s => s.kind === kind);
+      if (!list.length) return;
+      const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff }), list.length);
+      const col = new THREE.Color();
+      list.forEach((st, i) => {
+        pos.set(st.x, 0, st.z);
+        sc.setScalar(st.size);
+        m.compose(pos, q, sc);
+        mesh.setMatrixAt(i, m);
+        if (kind === 'project') col.set(STATUS_INFO[atlas.projects[st.index].st].color).multiplyScalar(1.35);
+        else col.set('#c9cbd6');
+        mesh.setColorAt(i, col);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      this.root.add(mesh);
+      this.starMeshes.push({ mesh, kind, ids: list.map(s => this.stars.indexOf(s)) });
+    };
+    make('project', new THREE.IcosahedronGeometry(1, 1));
+    make('partner', new THREE.OctahedronGeometry(1.2));
+
+    // anillo para los proyectos con auditoría registrada
+    const audited = this.stars.filter(s => s.kind === 'project' && atlas.projects[s.index].au);
+    if (audited.length) {
+      const rings = new THREE.InstancedMesh(
+        new THREE.TorusGeometry(1, 0.07, 6, 40),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffffff').multiplyScalar(1.2), transparent: true, opacity: 0.85 }),
+        audited.length,
+      );
+      const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2.4, 0, 0));
+      audited.forEach((st, i) => {
+        pos.set(st.x, 0, st.z);
+        sc.setScalar(st.size * 1.8);
+        m.compose(pos, tilt, sc);
+        rings.setMatrixAt(i, m);
+      });
+      rings.instanceMatrix.needsUpdate = true;
+      this.root.add(rings);
+    }
+  }
+
+  starName(s: Star): string {
+    return s.kind === 'project' ? this.atlas!.projects[s.index].n : this.atlas!.partners[s.index].n;
+  }
+
+  /** vuela hacia un astro del atlas (desde el Observatorio o desde una ficha) */
+  flyToStar(kind: Star['kind'], index: number) {
+    const s = this.stars.find(x => x.kind === kind && x.index === index);
+    if (s) { this.autopilot = new THREE.Vector3(s.x, 4, s.z + s.size + 4); return; }
+    // el proyecto es un nodo curado del mapa
+    const slug = kind === 'project' ? this.atlas?.projects[index]?.s : undefined;
+    const n = slug ? NODES.find(x => nodeSlug(x.id) === slug) : undefined;
+    if (n) this.flyTo(n);
   }
 
   /** actualiza el aspecto de los nodos según lo descubierto, quién controla cada sector y el casco */
@@ -202,7 +290,7 @@ export class Universe {
     let down: { x: number; y: number; moved: boolean; button: number } | null = null;
     const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, moved: false, button: e.button }; };
     const onMove = (e: PointerEvent) => {
-      if (!down) return;
+      if (!down) { if (e.target === el && !this.frozen) this.hover(e); else this.hoverLabel.style.display = 'none'; return; }
       const dx = e.clientX - down.x, dy = e.clientY - down.y;
       if (Math.abs(dx) + Math.abs(dy) > 4) down.moved = true;
       if (down.moved) {
@@ -240,16 +328,43 @@ export class Universe {
     });
   }
 
-  private click(e: PointerEvent) {
+  private setRay(e: PointerEvent) {
     const rect = this.space.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.space.camera);
+  }
+
+  private pickStar(): Star | null {
+    let best: { star: Star; d: number } | null = null;
+    for (const sm of this.starMeshes) {
+      for (const h of this.raycaster.intersectObject(sm.mesh, false)) {
+        if (h.instanceId === undefined) continue;
+        if (!best || h.distance < best.d) best = { star: this.stars[sm.ids[h.instanceId]], d: h.distance };
+      }
+    }
+    return best?.star ?? null;
+  }
+
+  private hover(e: PointerEvent) {
+    this.setRay(e);
+    const star = this.pickStar();
+    if (!star) { this.hoverLabel.style.display = 'none'; return; }
+    const rect = this.space.renderer.domElement.getBoundingClientRect();
+    this.hoverLabel.textContent = this.starName(star);
+    this.hoverLabel.style.display = '';
+    this.hoverLabel.style.transform = `translate(${e.clientX - rect.left + 14}px, ${e.clientY - rect.top - 10}px)`;
+  }
+
+  private click(e: PointerEvent) {
+    this.setRay(e);
     const hits = this.raycaster.intersectObjects(this.nodes.map(v => v.core), false);
     if (hits.length) {
       const v = this.nodes.find(x => x.core === hits[0].object)!;
       this.flyTo(v.node);
       return;
     }
+    const star = this.pickStar();
+    if (star) { this.autopilot = new THREE.Vector3(star.x, 4, star.z + star.size + 4); return; }
     const p = new THREE.Vector3();
     if (this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -4), p)) this.autopilot = p;
   }
@@ -272,8 +387,8 @@ export class Universe {
     }
     this.shipVel.lerp(want, 1 - Math.exp(-dt * 4));
     this.ship.position.addScaledVector(this.shipVel, dt);
-    this.ship.position.x = THREE.MathUtils.clamp(this.ship.position.x, -980, 980);
-    this.ship.position.z = THREE.MathUtils.clamp(this.ship.position.z, -980, 980);
+    this.ship.position.x = THREE.MathUtils.clamp(this.ship.position.x, -WORLD_HALF, WORLD_HALF);
+    this.ship.position.z = THREE.MathUtils.clamp(this.ship.position.z, -WORLD_HALF, WORLD_HALF);
     this.ship.position.y = 4 + Math.sin(this.t * 1.8) * 0.6;
     if (this.shipVel.lengthSq() > 4) {
       const yaw = Math.atan2(this.shipVel.x, this.shipVel.z);
@@ -295,6 +410,16 @@ export class Universe {
     }
     const node = near?.node ?? null;
     if (node !== this.current) { this.current = node; this.ev.onNode(node); }
+    // astro del atlas bajo la nave (los nodos curados tienen prioridad)
+    let star: Star | null = null;
+    if (!node) {
+      let bd = Infinity;
+      for (const st of this.stars) {
+        const d = Math.hypot(st.x - this.ship.position.x, st.z - this.ship.position.z);
+        if (d < st.size + 7 && d < bd) { bd = d; star = st; }
+      }
+    }
+    if (star !== this.currentStar) { this.currentStar = star; this.ev.onStar(star); }
     const gal = GALAXIES.find(g => Math.hypot(g.center[0] - this.ship.position.x, g.center[1] - this.ship.position.z) < g.radius * 1.15) ?? null;
     if (gal !== this.currentGalaxy) { this.currentGalaxy = gal; this.ev.onGalaxy(gal); }
 
@@ -320,8 +445,32 @@ export class Universe {
       v.label.classList.toggle('here', v.node === this.current);
     }
     for (const { g, el } of this.galaxyLabels) {
-      put(el, new THREE.Vector3(g.center[0], 0, g.center[1] - g.radius * 1.15), 0, 2400);
+      put(el, new THREE.Vector3(g.center[0], 0, g.center[1] - g.radius * 1.15), 0, 3200);
     }
+    // nombres de los astros más cercanos a la nave
+    const sx = this.ship.position.x, sz = this.ship.position.z;
+    const near = this.stars
+      .map(st => ({ st, d: Math.hypot(st.x - sx, st.z - sz) }))
+      .filter(x => x.d < 260)
+      .sort((a, b) => a.d - b.d);
+    // sin solapes: se descarta una etiqueta que caería encima de otra ya colocada
+    const placed: { x: number; y: number }[] = [];
+    const v3 = new THREE.Vector3();
+    let k = 0;
+    for (const it of near) {
+      if (k >= NEAR_LABELS) break;
+      v3.set(it.st.x, it.st.size + 5, it.st.z).project(cam);
+      if (v3.z >= 1) continue;
+      const x = (v3.x * 0.5 + 0.5) * w, y = (-v3.y * 0.5 + 0.5) * h;
+      if (placed.some(p => Math.abs(p.x - x) < 90 && Math.abs(p.y - y) < 18)) continue;
+      placed.push({ x, y });
+      const el = this.nearLabels[k++];
+      el.textContent = this.starName(it.st);
+      el.classList.toggle('here', it.st === this.currentStar);
+      el.style.display = '';
+      el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
+    }
+    for (; k < NEAR_LABELS; k++) this.nearLabels[k].style.display = 'none';
   }
 
   dispose() {
