@@ -83,7 +83,7 @@ echo "$VAULT"
 invoke "$ARMORY" "$ADMIN" set_vault --vault "$VAULT" >/dev/null
 
 say "Catálogo de la armería"
-item() { invoke "$ARMORY" "$ADMIN" define_item --id "$1" --name "$2" --category "$3" --rarity "$4" --max_supply "$5" --price "$(($6 * STROOPS))" >/dev/null; echo "  $1 $2"; }
+item() { invoke "$ARMORY" "$ADMIN" define_item --id "$1" --name "$2" --category "\"$3\"" --rarity "$4" --max_supply "$5" --price "$(($6 * STROOPS))" >/dev/null; echo "  $1 $2"; }
 item 1   "Casco Aurora"               Skin      0 0     25
 item 2   "Casco Nebulosa"             Skin      1 5000  80
 item 3   "Casco Consenso Dorado"      Skin      2 500   250
