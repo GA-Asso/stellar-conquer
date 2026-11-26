@@ -7,7 +7,21 @@ entrena drones, robots y naves, conquista planetas y destruye el Núcleo enemigo
 La dinámica es la de los RTS clásicos (recolectar, construir, avanzar de era y atacar),
 pero el campo de batalla es una galaxia en 3D que puedes rotar, inclinar y acercar.
 
-## La idea
+## Dos capas
+
+- **Universo Stellar (mundo abierto).** Pilotas una nave entre seis galaxias, una por área del ecosistema
+  (consenso, wallets, DeFi, pagos, Soroban y la Frontera). Cada nodo es un proyecto o una pieza real de
+  Stellar: lo descubres leyendo qué es y respondiendo su pregunta. Aquí están el **DEX** (pools AMM y
+  path payments), el **mercado de ítems** de la Armería y el **Puerto Comercial**, con encargos que pagan
+  en USDC o STAR.
+- **La Frontera (RTS).** Cada sector en disputa es una partida de estrategia. Llevas hasta 3 ítems
+  (se queman al despegar), y al terminar el sobrante se liquida como en el contrato Vault y la victoria
+  paga STAR como Conquest.
+
+Por ahora la economía corre en el navegador con las mismas reglas que los contratos; el siguiente paso
+es firmar con Freighter en testnet.
+
+## La idea (partida RTS)
 
 - **Estación modular.** No hay ciudad: hay una estación. Cada módulo (hábitat, panel solar, hangar, laboratorio, torreta…)
   se acopla a un puerto libre de un módulo existente y queda conectado por un pasillo.
@@ -45,6 +59,7 @@ pnpm dev
 
 ```
 game/
+  src/world/    Universo Stellar: economía, mapa del ecosistema, render y HUD
   src/sim/      simulación determinista (sin Three.js)
   src/render/   render 3D procedural con Three.js
   src/ui/       HUD, entrada y menús

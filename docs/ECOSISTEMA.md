@@ -126,10 +126,28 @@ El script escribe las direcciones en `game/src/chain/deployment.<red>.json`.
 - Publicar `stellar.toml` en el dominio del juego (SEP-1) con los cuatro activos, para que las
   wallets los muestren verificados.
 
+## El Universo Stellar y lo que busca la red
+
+La estrategia 2026 de la SDF prioriza servicios financieros del día a día, más valor en activos,
+más wallets y más liquidez. El universo está pensado para sumar justo eso, no un token especulativo:
+
+| Prioridad de Stellar | Cómo la toca el juego |
+|---|---|
+| Wallets nuevas | cada jugador es una cuenta; el plan es entrar con passkeys (smart wallets) sin frase semilla |
+| Liquidez y uso del DEX | LMN, MTL y NRG se cambian en los pools nativos; los encargos se pagan con path payments |
+| Activos reales | precios y encargos en USDC; nodos sobre anclas, MoneyGram y activos tokenizados |
+| Educación del ecosistema | 27 nodos con proyectos y piezas reales, cada uno con su enlace y su pregunta |
+
+`game/src/world/economy.ts` replica en local lo que hará la red: pools x·y=k con la comisión de 0,30 %
+de los pools nativos, rutas de hasta 3 saltos, quema de la mitad en la tienda, 5 % de regalía en el
+mercado, carga que se quema como `Vault.open` y liquidación con tope como `Vault.settle`.
+
 ## Siguiente paso: conectar el juego
 
 - **Wallet**: Freighter con `@stellar/freighter-api` y `@stellar/stellar-sdk` para firmar `open`,
-  `deposit`, `sell` y las trustlines de LMN, MTL y NRG.
+  `deposit`, `sell` y las trustlines de LMN, MTL y NRG. Después, smart wallets con passkeys.
+- **Adaptador de red**: sustituir las funciones de `economy.ts` por operaciones reales (path payments
+  en el DEX de testnet, llamadas a Armory y Vault) manteniendo la misma interfaz.
 - **Registro de comandos**: el juego ya es determinista. Falta grabar `seed + comandos` para que el
   verificador pueda re-simular.
 - **Verificador**: un servicio en Node que reutiliza `game/src/sim`, re-simula, compara el hash del
