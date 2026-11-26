@@ -3,8 +3,9 @@
 // (consultado el 2026-11-26) y enlazan a su web oficial. Ningún nodo usa logos ni marca de terceros:
 // son puntos de descubrimiento con texto propio.
 import type { Asset } from './economy';
+import { ATLAS_GALAXIES } from './atlas';
 
-export type NodeKind = 'info' | 'dex' | 'market' | 'trade' | 'frontier';
+export type NodeKind = 'info' | 'dex' | 'market' | 'trade' | 'frontier' | 'atlas';
 
 export interface Quiz { q: string; options: string[]; answer: number }
 
@@ -28,22 +29,29 @@ export interface Galaxy { id: string; name: string; color: string; center: [numb
 export const GALAXIES: Galaxy[] = [
   { id: 'nucleo', name: 'Núcleo de Consenso', color: '#fdda24', center: [0, 0], radius: 150,
     blurb: 'El corazón de la red: validadores, ledgers y las herramientas para verlo todo.' },
-  { id: 'wallets', name: 'Nebulosa de Wallets', color: '#2ee6ff', center: [-430, -260], radius: 150,
+  { id: 'wallets', name: 'Nebulosa de Wallets', color: '#2ee6ff', center: [-640, -430], radius: 150,
     blurb: 'Donde vive tu identidad en Stellar: wallets con y sin extensión, y cuentas con passkeys.' },
-  { id: 'defi', name: 'Galaxia DeFi', color: '#8b5cff', center: [430, -260], radius: 170,
+  { id: 'defi', name: 'Galaxia DeFi', color: '#8b5cff', center: [640, -430], radius: 170,
     blurb: 'El DEX nativo, los pools AMM y los protocolos Soroban que mueven liquidez.' },
-  { id: 'pagos', name: 'Cúmulo de Pagos', color: '#4ade80', center: [-430, 300], radius: 160,
+  { id: 'pagos', name: 'Cúmulo de Pagos', color: '#4ade80', center: [-700, 480], radius: 160,
     blurb: 'Dólares digitales, anclas y activos del mundo real: la red al servicio de los pagos.' },
-  { id: 'soroban', name: 'Forja Soroban', color: '#ff9f43', center: [430, 300], radius: 150,
+  { id: 'soroban', name: 'Forja Soroban', color: '#ff9f43', center: [700, 480], radius: 150,
     blurb: 'Contratos inteligentes, quien los construye y quien los financia. Aquí está el mercado de ítems.' },
-  { id: 'frontera', name: 'La Frontera', color: '#ff3d8b', center: [0, 620], radius: 200,
+  { id: 'frontera', name: 'La Frontera', color: '#ff3d8b', center: [0, 980], radius: 200,
     blurb: 'Sectores en disputa. Cada uno es una partida de estrategia: gánala y el sector es tuyo.' },
+  // galaxias que solo pueblan los proyectos del atlas de Raven; el radio se ajusta al cargar los datos
+  ...ATLAS_GALAXIES.map(g => ({ ...g, radius: 150 })),
 ];
+
+/** radio libre en el centro de cada galaxia curada, reservado a sus nodos */
+export const CURATED_INNER: Record<string, number> = { nucleo: 165, wallets: 165, defi: 175, pagos: 170, soroban: 165 };
 
 const S = 'Fuente: directorio del ecosistema de LumenLoop.';
 
 export const NODES: WorldNode[] = [
   // ---------- Núcleo de Consenso ----------
+  { id: 'observatorio', galaxy: 'nucleo', name: 'Observatorio Raven', kind: 'atlas', at: [0, 130],
+    desc: 'Todo lo que Raven sabe del ecosistema, en gráficos: proyectos por categoría, financiación del SCF, TVL, stablecoins, activos reales, auditorías, actividad de desarrolladores y hackathons. Cada estrella del universo es uno de estos proyectos.' },
   { id: 'scp', galaxy: 'nucleo', name: 'Stellar Consensus Protocol', kind: 'info', at: [0, 0],
     desc: 'Stellar no se mina. Cada validador elige en qué otros validadores confía (su quórum) y la red llega a acuerdo cuando esos quórums se solapan. Así cierra un ledger cada pocos segundos con un coste mínimo.',
     url: 'https://developers.stellar.org/docs/learn/fundamentals/stellar-consensus-protocol',
@@ -204,6 +212,16 @@ export const NODES: WorldNode[] = [
   { id: 'f-abismo', galaxy: 'frontera', name: 'Abismo Galáctico', kind: 'frontier', sector: 'abismo', at: [0, 160],
     desc: 'El rival más duro de la galaxia. Paga el triple de STAR.' },
 ];
+
+/**
+ * nodos curados que también son proyectos del atlas de Raven (id del nodo → slug del directorio): el
+ * proyecto no se duplica como estrella y el panel del nodo muestra sus datos
+ */
+const SLUG_OVERRIDES: Record<string, string> = { 'stellar-lab': 'stellar-laboratory', usdc: 'circle', sdf: 'stellar-development-foundation' };
+const PROJECT_NODES = ['freighter', 'lobstr', 'xbull', 'beans', 'soroswap', 'aquarius', 'phoenix', 'blend', 'defindex', 'reflector',
+  'stellar-expert', 'stellar-lab', 'moneygram', 'etherfuse', 'benji', 'openzeppelin', 'stellar-quest', 'sdf', 'usdc'];
+export const nodeSlug = (id: string): string | undefined => (PROJECT_NODES.includes(id) ? SLUG_OVERRIDES[id] ?? id : undefined);
+export const CURATED_SLUGS = new Set(PROJECT_NODES.map(id => nodeSlug(id)!));
 
 export const galaxyOf = (id: string) => GALAXIES.find(g => g.id === id)!;
 export const nodeWorldPos = (n: WorldNode): [number, number] => {
