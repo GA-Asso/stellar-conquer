@@ -352,7 +352,7 @@ const hash = (s: string, i = 0) => {
 };
 
 /** puerta de salto: anillo segmentado vertical con portal pulsante, mirando hacia la ruta */
-function jumpGate(color: THREE.Color): { obj: THREE.Group; tick(t: number): void } {
+export function jumpGate(color: THREE.Color): { obj: THREE.Group; tick(t: number): void } {
   const k = K(), g = new THREE.Group(), lights: { o: THREE.Object3D; p: number }[] = [];
   const R = 13;
   const frame = at(new THREE.Group(), 0, R + 2, 0);
@@ -380,7 +380,7 @@ function jumpGate(color: THREE.Color): { obj: THREE.Group; tick(t: number): void
 }
 
 /** casco de nave de tráfico (una sola geometría para instanciar): carguero con contenedores */
-function trafficGeometry(): { hull: THREE.BufferGeometry; engine: THREE.BufferGeometry } {
+export function trafficGeometry(): { hull: THREE.BufferGeometry; engine: THREE.BufferGeometry } {
   const parts: THREE.BufferGeometry[] = [];
   const add = (geo: THREE.BufferGeometry, x: number, y: number, z: number, rx = 0) => {
     if (rx) geo.rotateX(rx);
