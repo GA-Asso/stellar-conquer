@@ -636,6 +636,19 @@ const PLANET_PALETTES: [string, string][] = [
   ['#2c1f5e', '#c9a0ff'], ['#0f3b57', '#6fe3ff'], ['#5a3212', '#ffc46b'], ['#123d2a', '#8cff9e'], ['#4b1030', '#ff8fb8'],
 ];
 
+/** halo de atmósfera: una esfera algo mayor, por dentro, que brilla en el borde (efecto Fresnel) */
+function atmosphere(radius: number, color: string): THREE.Mesh {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color).multiplyScalar(1.6) } },
+    vertexShader: `varying vec3 vN; varying vec3 vV;
+      void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 uColor; varying vec3 vN; varying vec3 vV;
+      void main() { float f = pow(clamp(0.72 + dot(vN, vV), 0.0, 1.0), 4.0); gl_FragColor = vec4(uColor * f, f); }`,
+    side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  return new THREE.Mesh(new THREE.SphereGeometry(radius * 1.16, 48, 32), mat);
+}
+
 export function buildPlanet(index: number, radius: number): { group: THREE.Group; material: THREE.ShaderMaterial; ring: THREE.Mesh } {
   const [a, b] = PLANET_PALETTES[index % PLANET_PALETTES.length];
   const material = new THREE.ShaderMaterial({
@@ -647,6 +660,7 @@ export function buildPlanet(index: number, radius: number): { group: THREE.Group
   });
   const g = new THREE.Group();
   g.add(new THREE.Mesh(new THREE.SphereGeometry(radius, 48, 32), material));
+  g.add(atmosphere(radius, b));
   // anillo de captura: se tiñe del color del dueño y crece con el progreso
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(radius * 1.35, radius * 1.5, 96),
