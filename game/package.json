@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "snapshot": "node scripts/raven-snapshot.mjs"
   },
   "dependencies": {
     "three": "^0.187.0"
