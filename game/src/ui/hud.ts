@@ -453,7 +453,7 @@ export class Hud {
     }
   }
 
-  showEnd(s: SimState, onRestart: () => void) {
+  showEnd(s: SimState, onRestart: () => void, opts: { label?: string; extra?: string } = {}) {
     const win = s.winner === this.side;
     const d = document.createElement('div');
     d.className = 'endscreen';
@@ -462,7 +462,8 @@ export class Hud {
       <h1>${win ? 'Victoria' : 'Derrota'}</h1>
       <p>${s.winReason}</p>
       <p class="muted">Ledger #${s.ledger} · ${Math.floor(s.tick / TICK_HZ / 60)} min · Núcleo ${core ? 'en pie' : 'destruido'}</p>
-      <button>Jugar de nuevo</button></div>`;
+      ${opts.extra ? `<p class="settle">${opts.extra}</p>` : ''}
+      <button>${opts.label ?? 'Jugar de nuevo'}</button></div>`;
     d.querySelector('button')!.addEventListener('click', () => { d.remove(); onRestart(); });
     this.root.appendChild(d);
   }
