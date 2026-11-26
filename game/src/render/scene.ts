@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { MAP_HALF } from '../sim/defs';
 
 export const STELLAR_GOLD = new THREE.Color('#fdda24');
@@ -92,6 +93,30 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
+// pasada final, después del tone mapping: gradación de color (sombras hacia el azul, luces hacia el oro),
+// viñeta, aberración cromática solo en los bordes y un grano muy fino que quita el aspecto plano del CG
+const FinishShader = {
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uWarp: { value: 0 }, uAspect: { value: 1 } },
+  vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse; uniform float uTime; uniform float uWarp; uniform float uAspect; varying vec2 vUv;
+    float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main() {
+      vec2 c = vUv - 0.5;
+      float r = length(c * vec2(uAspect, 1.0));
+      // aberración cromática que crece hacia los bordes (y un poco más a toda velocidad)
+      vec2 off = c * (0.0016 + uWarp * 0.004) * smoothstep(0.15, 0.75, r);
+      vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+      float l = dot(col, vec3(0.299, 0.587, 0.114));
+      col = mix(col, col * vec3(0.92, 0.98, 1.12), (1.0 - smoothstep(0.0, 0.45, l)) * 0.6);
+      col = mix(col, col * vec3(1.06, 1.02, 0.92), smoothstep(0.55, 1.0, l) * 0.5);
+      col = mix(vec3(l), col, 1.08);
+      col *= mix(1.0, smoothstep(1.05, 0.25, r), 0.55 + uWarp * 0.2);
+      col += (rnd(vUv * 731.0 + fract(uTime * 7.3)) - 0.5) * 0.022;
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+};
+
 export interface SpaceScene {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -100,6 +125,8 @@ export interface SpaceScene {
   composer: EffectComposer;
   bloom: UnrealBloomPass;
   nebula: THREE.ShaderMaterial;
+  /** 0..1: intensidad del efecto de velocidad (viñeta y aberración) */
+  setWarp(k: number): void;
   resize(): void;
   render(dt: number): void;
 }
@@ -134,11 +161,15 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
   sunGlow.position.set(-1500, 1100, 900);
   scene.add(sunGlow);
 
-  const composer = new EffectComposer(renderer);
+  // con posprocesado el canvas pierde su antialiasing: el render target lleva su propio MSAA
+  const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: renderer.capabilities.isWebGL2 ? 4 : 0 });
+  const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.35, 1.0);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  const finish = new ShaderPass(FinishShader);
+  composer.addPass(finish);
 
   const resize = () => {
     const w = host.clientWidth, h = host.clientHeight;
@@ -147,6 +178,7 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
     bloom.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    finish.uniforms.uAspect.value = w / Math.max(1, h);
   };
   resize();
   window.addEventListener('resize', resize);
@@ -154,8 +186,10 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
   let t = 0;
   return {
     renderer, scene, camera, rig, composer, bloom, nebula, resize,
+    setWarp(k: number) { finish.uniforms.uWarp.value = k; },
     render(dt: number) {
       t += dt;
+      finish.uniforms.uTime.value = t;
       nebula.uniforms.uTime.value = t;
       rig.update(dt);
       sky.position.copy(camera.position);
