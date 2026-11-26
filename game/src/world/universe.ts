@@ -101,6 +101,7 @@ export class Universe {
   private scenery: Scenery;
   private trail = new Trail();
   private glowTick: ((t: number) => void) | null = null;
+  private warp = 0;
   frozen = false;
 
   constructor(private space: SpaceScene, private world: WorldState, host: HTMLElement, private ev: UniverseEvents, private atlas: RavenSnapshot | null = null) {
@@ -156,6 +157,10 @@ export class Universe {
     this.ship.scale.setScalar(2.4);
     this.ship.position.set(0, 4, 90);
     this.root.add(this.ship);
+    // luz del motor: ilumina las estaciones y los astros al pasar cerca
+    const engine = new THREE.PointLight(0x7fe6ff, 900, 80, 2);
+    engine.position.set(0, 1.5, -2);
+    this.ship.add(engine);
     this.trail.reset(this.ship.position);
     this.root.add(this.trail.points);
     this.refresh();
@@ -396,6 +401,13 @@ export class Universe {
     this.scenery.update(dt, this.t);
     this.glowTick?.(this.t);
     this.trail.update(dt, this.ship.position, this.shipVel.length());
+    // sensación de velocidad: el campo de visión se abre y los bordes se oscurecen al acelerar
+    const k = THREE.MathUtils.smoothstep(this.shipVel.length() / SHIP_SPEED, 0.45, 1);
+    this.warp += (k - this.warp) * Math.min(1, dt * 3);
+    const cam = this.space.camera;
+    const fov = 50 + this.warp * 8;
+    if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+    this.space.setWarp(this.warp);
 
     // nodo y galaxia donde está la nave
     let near: NodeView | null = null, best = ARRIVE;
@@ -479,5 +491,8 @@ export class Universe {
     });
     this.labels.remove();
     this.space.rig.bound = this.prevBound;
+    this.space.camera.fov = 50;
+    this.space.camera.updateProjectionMatrix();
+    this.space.setWarp(0);
   }
 }
