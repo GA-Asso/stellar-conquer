@@ -7,9 +7,10 @@ import { createSpaceScene } from './render/scene';
 import { GameView } from './render/view';
 import { Hud } from './ui/hud';
 import { Input } from './ui/input';
-import { consumeLoadout, loadWorld, saveWorld, settleMatch, tickLedger, type MatchLoadout, type Sector, type WorldState } from './world/economy';
+import { consumeLoadout, fmt, loadWorld, resetWorld, savedWorld, saveWorld, settleMatch, tickLedger, type MatchLoadout, type Sector, type WorldState } from './world/economy';
 import { WorldHud } from './world/hud';
-import type { RavenSnapshot } from './world/atlas';
+import { usd, type RavenSnapshot } from './world/atlas';
+import { DISCOVERABLE, GALAXIES } from './world/ecosystem';
 import { Universe } from './world/universe';
 
 const LOCAL: Side = 0;
@@ -27,29 +28,56 @@ let cosmos: Cosmos | null = null;
 const LEDGER_SECONDS = 5;
 const RETURN_KEY = 'stellar-conquer.return';
 
+// Menú de entrada: dos modos (Universo y partida rápida), progreso guardado y cifras del ecosistema
 function showLobby() {
+  const saved = savedWorld();
   const d = document.createElement('div');
   d.className = 'lobby';
+  const progress = saved ? `
+      <div class="lb-progress">
+        <div><b>${saved.discovered.length}<small>/${DISCOVERABLE.length}</small></b><span>nodos</span></div>
+        <div><b>${saved.visited?.length ?? 0}</b><span>proyectos visitados</span></div>
+        <div><b>${saved.sectors.filter(x => x.owner === 'player').length}<small>/${saved.sectors.length}</small></b><span>sectores</span></div>
+        <div><b>${fmt(saved.wallet.STAR)}</b><span>STAR</span></div>
+      </div>` : '';
   d.innerHTML = `
-    <div class="lobby-card">
-      <div class="title"><span class="logo big"></span><h1>STELLAR <b>CONQUER</b></h1></div>
-      <p class="tag">Estrategia en tiempo real sobre el ecosistema Stellar.<br>Mina Lumens, acopla tu estación módulo a módulo, conquista planetas y derriba el Núcleo rival.</p>
-      <div class="howto">
-        <div><i>◆</i><b>1 · Recolecta</b><p>Selecciona tus drones <span class="cy">(cian)</span> y haz clic derecho en asteroides <span class="gold">dorados (Lumens)</span> o <span class="cu">cobrizos (metal)</span>.</p></div>
-        <div><i>⬡</i><b>2 · Acopla módulos</b><p>Con un dron elige un módulo y colócalo en un hexágono verde pegado a tu estación: hábitats, paneles, hangares…</p></div>
-        <div><i>➤</i><b>3 · Arma tu flota</b><p>Hangar = naves. Forja = robots, los únicos que conquistan planetas. Cada planeta paga Lumens en cada ledger.</p></div>
-        <div><i>✦</i><b>4 · Gana</b><p>Destruye el Núcleo <span class="pk">rosa</span> del rival, o construye el Faro de Consenso y haz que resista 30 ledgers.</p></div>
+    <div class="lb">
+      <header class="lb-hero">
+        <div class="title"><span class="logo big"></span><h1>STELLAR <b>CONQUER</b></h1></div>
+        <p class="lb-tag">Explora el ecosistema Stellar, comercia en su DEX y conquista la Frontera.</p>
+        <div class="lb-stats" id="lb-stats"><span>Cargando el atlas del ecosistema…</span></div>
+      </header>
+      <div class="lb-modes">
+        <section class="lb-card primary">
+          <div class="lb-kicker">Mundo abierto</div>
+          <h2>Universo Stellar</h2>
+          <ul class="lb-list">
+            <li><i>✦</i><span><b>Explora</b> galaxias donde cada estrella es un proyecto real del ecosistema.</span></li>
+            <li><i>⇄</i><span><b>Comercia</b> en el DEX con path payments, en el mercado de ítems y con encargos.</span></li>
+            <li><i>⚔</i><span><b>Conquista</b> los sectores de la Frontera en partidas de estrategia.</span></li>
+          </ul>
+          ${progress}
+          <button class="play" id="go-universe">${saved ? 'Continuar el viaje' : 'Entrar al Universo'}</button>
+          ${saved ? `<div class="lb-reset"><button class="lb-link" id="lb-reset">Empezar de cero</button>
+            <span class="lb-confirm" hidden>¿Borrar tu progreso? <button class="lb-link danger" id="lb-reset-yes">Sí, borrar</button> <button class="lb-link" id="lb-reset-no">Cancelar</button></span></div>` : ''}
+        </section>
+        <section class="lb-card">
+          <div class="lb-kicker">Estrategia en tiempo real</div>
+          <h2>Partida rápida</h2>
+          <ol class="lb-steps">
+            <li><b>Recolecta</b> Lumens y metal con tus drones.</li>
+            <li><b>Acopla módulos</b> a tu estación.</li>
+            <li><b>Arma tu flota</b> y conquista planetas.</li>
+            <li><b>Derriba</b> el Núcleo rival o haz resistir el Faro.</li>
+          </ol>
+          <div class="diff">
+            <span>Rival</span>
+            <div class="opts"><button data-d="facil">Fácil</button><button data-d="normal" class="on">Normal</button><button data-d="dificil">Difícil</button></div>
+          </div>
+          <button class="play secondary" id="go-match">Jugar partida</button>
+        </section>
       </div>
-      <button class="play" id="go-universe">Entrar al Universo Stellar</button>
-      <p class="footnote">Vuela entre galaxias del ecosistema, descubre sus proyectos, comercia en el DEX y el mercado, y conquista la Frontera.</p>
-      <div class="diff">
-        <span>O juega una partida rápida · rival</span>
-        <div class="opts">
-          <button data-d="facil">Fácil</button><button data-d="normal" class="on">Normal</button><button data-d="dificil">Difícil</button>
-        </div>
-      </div>
-      <button class="play secondary" id="go-match">Partida rápida</button>
-      <p class="footnote">Una guía de objetivos te acompaña durante la partida (arriba a la izquierda). Pasa el ratón sobre cualquier botón para ver para qué sirve.</p>
+      <footer class="lb-foot" id="lb-foot">Contratos Soroban: Conquest · Armory · Vault · Economía en tu navegador, testnet en camino</footer>
     </div>`;
   let diff: Difficulty = 'normal';
   d.querySelectorAll<HTMLButtonElement>('.opts button').forEach(b => b.addEventListener('click', () => {
@@ -59,7 +87,27 @@ function showLobby() {
   }));
   d.querySelector('#go-match')!.addEventListener('click', () => { d.remove(); start(diff); });
   d.querySelector('#go-universe')!.addEventListener('click', () => { d.remove(); void enterUniverse(); });
+  const confirm = d.querySelector<HTMLElement>('.lb-confirm');
+  d.querySelector('#lb-reset')?.addEventListener('click', e => { (e.target as HTMLElement).hidden = true; confirm!.hidden = false; });
+  d.querySelector('#lb-reset-no')?.addEventListener('click', () => { confirm!.hidden = true; d.querySelector<HTMLElement>('#lb-reset')!.hidden = false; });
+  d.querySelector('#lb-reset-yes')?.addEventListener('click', () => { resetWorld(); d.remove(); showLobby(); });
   app.appendChild(d);
+
+  // cifras del atlas de Raven (el mismo fragmento de datos que usará el universo)
+  void loadAtlas().then(a => {
+    const el = d.querySelector('#lb-stats');
+    if (!el) return;
+    if (!a) { el.innerHTML = ''; return; }
+    const t = a.totals;
+    el.innerHTML = [
+      [t.projects.toLocaleString('es'), 'proyectos'],
+      [String(GALAXIES.length), 'galaxias'],
+      [usd(t.scfUSD), 'del SCF'],
+      [usd(t.tvlUSD), 'de TVL'],
+    ].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
+    const foot = d.querySelector('#lb-foot');
+    if (foot) foot.textContent = `Datos del ecosistema: Stellar Scout vía Raven, ${new Date(a.generatedAt).toLocaleDateString('es')} · Contratos Soroban: Conquest · Armory · Vault · Testnet en camino`;
+  });
 }
 
 async function loadAtlas(): Promise<RavenSnapshot | null> {

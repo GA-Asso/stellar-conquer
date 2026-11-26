@@ -424,6 +424,19 @@ export function loadWorld(): WorldState {
   return createWorld((Math.random() * 2 ** 31) >>> 0);
 }
 
+/** partida guardada, sin crear una nueva si no existe (para el menú de entrada) */
+export function savedWorld(): WorldState | null {
+  try {
+    const raw = localStorage.getItem(KEY);
+    const w = raw ? (JSON.parse(raw) as WorldState) : null;
+    return w?.version === 1 ? w : null;
+  } catch { return null; }
+}
+
+export function resetWorld() {
+  try { localStorage.removeItem(KEY); } catch { /* sin almacenamiento */ }
+}
+
 export function saveWorld(w: WorldState) {
   try { localStorage.setItem(KEY, JSON.stringify(w)); } catch { /* sin almacenamiento */ }
 }
