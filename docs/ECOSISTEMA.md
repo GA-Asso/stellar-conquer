@@ -136,11 +136,20 @@ más wallets y más liquidez. El universo está pensado para sumar justo eso, no
 | Wallets nuevas | cada jugador es una cuenta; el plan es entrar con passkeys (smart wallets) sin frase semilla |
 | Liquidez y uso del DEX | LMN, MTL y NRG se cambian en los pools nativos; los encargos se pagan con path payments |
 | Activos reales | precios y encargos en USDC; nodos sobre anclas, MoneyGram y activos tokenizados |
-| Educación del ecosistema | 27 nodos con proyectos y piezas reales, cada uno con su enlace y su pregunta |
+| Educación del ecosistema | 27 nodos con pregunta y ~900 proyectos reales del atlas, con su ficha y su enlace |
 
 `game/src/world/economy.ts` replica en local lo que hará la red: pools x·y=k con la comisión de 0,30 %
 de los pools nativos, rutas de hasta 3 saltos, quema de la mitad en la tienda, 5 % de regalía en el
 mercado, carga que se quema como `Vault.open` y liquidación con tope como `Vault.settle`.
+
+### Atlas del ecosistema
+
+`game/scripts/raven-snapshot.mjs` descarga de la API pública de Stellar Scout (stellarlight.xyz, MIT)
+los proyectos activos, la financiación del SCF, el TVL, las auditorías, las stablecoins, los activos RWA,
+la actividad de desarrollo, los hackathons y los socios, y lo guarda en `game/src/world/data/raven.json`
+con su fecha. El juego dibuja cada proyecto como una estrella (`atlas.ts`, `universe.ts`) y el
+Observatorio resume los datos en gráficos (`observatory.ts`). Que un dato falte significa que la fuente
+no lo tiene, no que no exista.
 
 ## Siguiente paso: conectar el juego
 

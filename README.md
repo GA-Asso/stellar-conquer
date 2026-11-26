@@ -18,6 +18,12 @@ pero el campo de batalla es una galaxia en 3D que puedes rotar, inclinar y acerc
   (se queman al despegar), y al terminar el sobrante se liquida como en el contrato Vault y la victoria
   paga STAR como Conquest.
 
+- **Atlas de Raven.** Cada estrella del universo es uno de los ~900 proyectos activos del ecosistema,
+  en la galaxia de su tipo: el color indica su estado, el tamaño la financiación del SCF y el TVL, y un
+  anillo que tiene auditoría. Al llegar a una estrella ves su ficha. El **Observatorio** (tecla O) reúne
+  todo en gráficos: SCF, TVL, stablecoins, activos reales, auditorías, actividad y hackathons. Los datos
+  salen de la API pública de Stellar Scout, la misma fuente que usa Raven; `pnpm snapshot` los refresca.
+
 Por ahora la economía corre en el navegador con las mismas reglas que los contratos; el siguiente paso
 es firmar con Freighter en testnet.
 
@@ -53,6 +59,7 @@ infra/deploy.sh   # despliega todo en testnet
 cd game
 pnpm install
 pnpm dev
+pnpm snapshot   # opcional: refresca los datos del ecosistema
 ```
 
 ## Estructura
