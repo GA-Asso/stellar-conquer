@@ -387,7 +387,7 @@ export function settleMatch(w: WorldState, o: MatchOutcome): string {
     w.wallet.STAR = round(w.wallet.STAR + star);
     w.stats.wins++;
     if (s) s.owner = 'player';
-    msg = `¡${s?.name ?? 'Sector'} conquistado! +${star} STAR. ` + msg;
+    msg = (s ? `¡${s.name} conquistado! ` : '¡Victoria! ') + `+${star} STAR. ` + msg;
   } else {
     w.stats.losses++;
     msg = `Retirada de ${s?.name ?? 'la Frontera'}. ` + msg;
