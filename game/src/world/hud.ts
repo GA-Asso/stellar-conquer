@@ -3,9 +3,24 @@
 import {
   ASSETS, ASSET_INFO, ITEMS, MAX_LOADOUT, ROYALTY, addToLoadout, bestRoute, buyFromShop, buyListing, cancelListing,
   discover, equipSkin, fmt, fulfillOrder, itemDef, listItem, quoteReceive, removeFromLoadout, spotPrice, swap,
-  type Asset, type Result, type Sector, type WorldState,
+  visitProject, VISIT_XLM, type Asset, type Result, type Sector, type WorldState,
 } from './economy';
-import { DISCOVERABLE, galaxyOf, type Galaxy, type WorldNode } from './ecosystem';
+import { DISCOVERABLE, galaxyOf, nodeSlug, type Galaxy, type WorldNode } from './ecosystem';
+import { STATUS_INFO, galaxyForProject, galaxyStats, projectUrl, usd, type RavenSnapshot, type Star } from './atlas';
+import { observatoryHtml, wireObservatory } from './observatory';
+
+const TYPE_ES: Record<string, string> = {
+  Wallet: 'Wallet', DEX: 'DEX', Lending: 'Préstamos', Bridge: 'Puente', Infrastructure: 'Infraestructura', Payments: 'Pagos',
+  Anchor: 'Ancla', SDK: 'SDK', Indexer: 'Indexador', Explorer: 'Explorador', Analytics: 'Analítica', AI: 'IA', Gaming: 'Juegos',
+  Education: 'Educación', Security: 'Seguridad', NFT: 'NFT', RWA: 'Activos reales', Stablecoin: 'Stablecoin',
+  'Social Impact': 'Impacto social', RPC: 'RPC', Faucet: 'Faucet', 'Card Issuing': 'Tarjetas', Exchange: 'Exchange',
+  Oracle: 'Oráculo', Yield: 'Rendimiento', Derivatives: 'Derivados',
+};
+const PARTNER_ES: Record<string, string> = {
+  anchor: 'Ancla', 'on-off-ramp': 'Rampa de entrada y salida', infrastructure: 'Infraestructura', tooling: 'Herramientas',
+  protocol: 'Protocolo', wallet: 'Wallet', 'audit-firm': 'Firma de auditoría', legal: 'Legal', agency: 'Agencia',
+  'asset-issuer': 'Emisor de activos', other: 'Otros',
+};
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 const DIFF_LABEL = { facil: 'Fácil', normal: 'Normal', dificil: 'Difícil' } as const;
@@ -16,6 +31,7 @@ export interface WorldHudEvents {
   onLaunch(sector: Sector): void;
   onQuickMatch(): void;
   setFrozen(f: boolean): void;
+  onFlyToStar(kind: Star['kind'], index: number): void;
 }
 
 export class WorldHud {
@@ -23,11 +39,12 @@ export class WorldHud {
   private panel: HTMLDivElement;
   private toasts: HTMLDivElement;
   private node: WorldNode | null = null;
+  private star: Star | null = null;
   private tab = '';
   private lastTop = '';
   private lastLog = '';
 
-  constructor(host: HTMLElement, private w: WorldState, private ev: WorldHudEvents) {
+  constructor(host: HTMLElement, private w: WorldState, private ev: WorldHudEvents, private atlas: RavenSnapshot | null = null) {
     this.root.className = 'u-hud';
     this.root.innerHTML = `
       <div class="topbar u-top">
@@ -35,6 +52,7 @@ export class WorldHud {
         <div class="u-wallet" id="u-wallet"></div>
         <div class="u-progress" id="u-progress"></div>
         <div class="u-mode" title="La economía corre en tu navegador con las mismas reglas que los contratos. El siguiente paso es firmar con Freighter en testnet.">Simulación local · testnet en camino</div>
+        <button class="u-btn" id="u-obs">Observatorio <kbd>O</kbd></button>
         <button class="u-btn" id="u-inv">Inventario <kbd>I</kbd></button>
         <button class="u-btn" id="u-help">Ayuda <kbd>H</kbd></button>
         <button class="u-btn" id="u-quick">Partida rápida</button>
@@ -42,12 +60,19 @@ export class WorldHud {
       <div class="u-galaxy" id="u-galaxy"></div>
       <div class="u-panel" id="u-panel"></div>
       <div class="u-log" id="u-log"></div>
+      <div class="u-legend" id="u-legend"></div>
       <div class="toasts"></div>
       <div class="u-modal" id="u-modal"></div>`;
     host.appendChild(this.root);
     this.panel = this.$('#u-panel') as HTMLDivElement;
     this.toasts = this.$('.toasts') as HTMLDivElement;
     this.$('#u-inv').addEventListener('click', () => this.toggleInventory());
+    this.$('#u-obs').addEventListener('click', () => this.toggleObservatory());
+    if (atlas) {
+      this.$('#u-legend').innerHTML = `<b>Cada estrella es un proyecto</b>${(['L', 'P', 'D'] as const).map(k =>
+        `<span><i style="background:${STATUS_INFO[k].color}"></i>${STATUS_INFO[k].label}</span>`).join('')}
+        <span><i class="ring"></i>con auditoría</span><span><i class="dia"></i>socio</span><span class="u-legend-size">tamaño = financiación SCF + TVL</span>`;
+    } else this.$('#u-obs').style.display = 'none';
     this.$('#u-help').addEventListener('click', () => this.toggleHelp());
     this.$('#u-quick').addEventListener('click', () => this.ev.onQuickMatch());
     this.keyHandler = (e: KeyboardEvent) => {
@@ -55,6 +80,7 @@ export class WorldHud {
       if (tag === 'INPUT' || tag === 'SELECT') return;
       if (e.key === 'i' || e.key === 'I') this.toggleInventory();
       if (e.key === 'h' || e.key === 'H') this.toggleHelp();
+      if (e.key === 'o' || e.key === 'O') this.toggleObservatory();
       if (e.key === 'Escape') this.closeModal();
     };
     window.addEventListener('keydown', this.keyHandler);
@@ -86,7 +112,8 @@ export class WorldHud {
   /** barra superior y registro; barato, se llama cada frame */
   update() {
     const top = ASSETS.map(a => `<span class="u-chip" title="${esc(ASSET_INFO[a].name)}: ${esc(ASSET_INFO[a].note)}"><i style="background:${ASSET_INFO[a].color}"></i>${fmt(this.w.wallet[a])} <b>${a}</b></span>`).join('');
-    const progress = `Nodos <b>${this.w.discovered.length}/${DISCOVERABLE.length}</b> · Sectores <b>${this.w.sectors.filter(s => s.owner === 'player').length}/${this.w.sectors.length}</b> · Ledger <b>#${this.w.ledger}</b>`;
+    const projects = this.atlas ? `Proyectos <b>${this.w.visited?.length ?? 0}/${this.atlas.projects.length}</b> · ` : '';
+    const progress = `${projects}Nodos <b>${this.w.discovered.length}/${DISCOVERABLE.length}</b> · Sectores <b>${this.w.sectors.filter(s => s.owner === 'player').length}/${this.w.sectors.length}</b>`;
     if (top + progress !== this.lastTop) {
       this.$('#u-wallet').innerHTML = top;
       this.$('#u-progress').innerHTML = progress;
@@ -99,13 +126,33 @@ export class WorldHud {
   setGalaxy(g: Galaxy | null) {
     const el = this.$('#u-galaxy');
     if (!g) { el.classList.remove('on'); return; }
-    el.innerHTML = `<b style="color:${g.color}">${esc(g.name)}</b><span>${esc(g.blurb)}</span>`;
+    let stats = '';
+    if (this.atlas && g.id !== 'frontera') {
+      const st = galaxyStats(this.atlas, g.id);
+      stats = g.id === 'socios'
+        ? `<em>${st.partners} socios del ecosistema</em>`
+        : `<em>${st.projects} proyectos · ${st.live} en producción · SCF ${usd(st.scf)}${st.tvl ? ` · TVL ${usd(st.tvl)}` : ''} · ${st.audited} auditados</em>`;
+    }
+    el.innerHTML = `<b style="color:${g.color}">${esc(g.name)}</b><span>${esc(g.blurb)}</span>${stats}`;
     el.classList.add('on');
+  }
+
+  setStar(s: Star | null) {
+    if (s === this.star) return;
+    this.star = s;
+    if (s && s.kind === 'project' && this.atlas) {
+      const p = this.atlas.projects[s.index];
+      if (visitProject(this.w, p.s)) { this.toast(`Visitaste ${p.n}: +${VISIT_XLM} XLM`, 'good'); this.ev.onChange(); }
+    }
+    if (!this.node) this.renderPanel();
   }
 
   setNode(n: WorldNode | null) {
     if (n?.id === this.node?.id) return;
     this.node = n;
+    const slug = n && nodeSlug(n.id);
+    const p = slug && this.atlas?.projects.find(x => x.s === slug);
+    if (p && visitProject(this.w, p.s)) { this.toast(`Visitaste ${p.n}: +${VISIT_XLM} XLM`, 'good'); this.ev.onChange(); }
     this.tab = '';
     this.renderPanel();
   }
@@ -117,16 +164,18 @@ export class WorldHud {
 
   private renderPanel() {
     const n = this.node;
+    if (!n && this.star && this.atlas) { this.renderStar(this.star); return; }
     if (!n) { this.panel.classList.remove('on'); this.panel.innerHTML = ''; return; }
     const g = galaxyOf(n.galaxy);
     const head = `<div class="u-ph"><small style="color:${g.color}">${esc(g.name)}</small><h2>${esc(n.name)}</h2></div><p class="u-desc">${esc(n.desc)}</p>`;
     const link = n.url ? `<a class="u-link" href="${esc(n.url)}" target="_blank" rel="noopener">Web oficial ↗</a>` : '';
     let body = '';
-    if (n.kind === 'info') body = this.infoBody(n);
+    if (n.kind === 'info') body = this.projectFacts(n) + this.infoBody(n);
     if (n.kind === 'dex') body = this.infoBody(n) + this.dexBody();
     if (n.kind === 'market') body = this.marketBody();
     if (n.kind === 'trade') body = this.tradeBody();
     if (n.kind === 'frontier') body = this.frontierBody(n);
+    if (n.kind === 'atlas') body = this.atlasBody();
     this.panel.innerHTML = head + link + body;
     this.panel.classList.add('on');
     this.wire(n);
@@ -197,6 +246,75 @@ export class WorldHud {
       <p class="u-note">La partida es la simulación determinista del juego: seed + comandos. Al terminar se liquida como en el contrato Vault (sobrante con tope de 500 por recurso).</p>`;
   }
 
+  /** datos de Raven para un nodo curado que es un proyecto del directorio */
+  private projectFacts(n: WorldNode): string {
+    const slug = nodeSlug(n.id);
+    const p = slug && this.atlas?.projects.find(x => x.s === slug);
+    if (!p) return '';
+    const st = STATUS_INFO[p.st];
+    return `<div class="u-chips"><span class="u-status"><i style="background:${st.color}"></i>${st.label}</span>${p.t.map(t => `<span>${esc(TYPE_ES[t] ?? t)}</span>`).join('')}</div>
+      <div class="u-kv"><span>Financiación SCF</span><b>${p.scf ? usd(p.scf) : 'sin registro'}</b><span>TVL</span><b>${p.tvl ? usd(p.tvl) : '—'}</b>
+      <span>Auditorías</span><b>${p.au ? `${p.au.n} · ${esc(p.au.by.join(', '))}` : 'sin registro'}</b></div>
+      <a class="u-link" href="${projectUrl(p.s)}" target="_blank" rel="noopener">Ficha en Stellar Light ↗</a> `;
+  }
+
+  private atlasBody(): string {
+    if (!this.atlas) return '<p class="u-note">No hay instantánea de datos. Genera una con <code>pnpm snapshot</code>.</p>';
+    const t = this.atlas.totals;
+    return `<div class="u-kv"><span>Proyectos</span><b>${t.projects.toLocaleString('es')}</b><span>SCF</span><b>${usd(t.scfUSD)}</b>
+      <span>TVL</span><b>${usd(t.tvlUSD)}</b><span>Stablecoins</span><b>${t.stablecoins}</b></div>
+      <button class="u-cta big" id="u-open-obs">Abrir el Observatorio</button>
+      <p class="u-note">Atajo: tecla O desde cualquier punto del universo.</p>`;
+  }
+
+  /** ficha de un astro del atlas: proyecto (datos de Raven) o socio */
+  private renderStar(s: Star) {
+    const a = this.atlas!;
+    const g = galaxyOf(s.galaxy);
+    let html: string;
+    if (s.kind === 'partner') {
+      const p = a.partners[s.index];
+      html = `<div class="u-ph"><small style="color:${g.color}">${esc(g.name)}</small><h2>${esc(p.n)}</h2></div>
+        <div class="u-chips"><span>${esc(PARTNER_ES[p.type] ?? p.type)}</span>${p.ramps.map(r => `<span>${esc(r)}</span>`).join('')}</div>
+        <p class="u-desc">${esc(p.tag)}</p>
+        ${p.regions.length ? `<div class="u-kv"><span>Regiones</span><b>${esc(p.regions.join(', '))}</b></div>` : ''}
+        ${p.url ? `<a class="u-link" href="${esc(p.url)}" target="_blank" rel="noopener">Web oficial ↗</a>` : ''}`;
+    } else {
+      const p = a.projects[s.index];
+      const st = STATUS_INFO[p.st];
+      const similar = a.projects
+        .map((q, i) => ({ q, i }))
+        .filter(({ q }) => q.s !== p.s && galaxyForProject(q) === s.galaxy && q.t.some(t => p.t.includes(t)))
+        .sort((x, y) => ((y.q.scf ?? 0) + (y.q.tvl ?? 0)) - ((x.q.scf ?? 0) + (x.q.tvl ?? 0)))
+        .slice(0, 4);
+      html = `<div class="u-ph"><small style="color:${g.color}">${esc(g.name)}</small><h2>${esc(p.n)}</h2></div>
+        <div class="u-chips"><span class="u-status"><i style="background:${st.color}"></i>${st.label}</span>${p.t.map(t => `<span>${esc(TYPE_ES[t] ?? t)}</span>`).join('')}</div>
+        <p class="u-desc">${esc(p.d || 'Sin descripción en el directorio.')}</p>
+        <div class="u-kv">
+          <span>Financiación SCF</span><b>${p.scf ? usd(p.scf) : 'sin registro'}</b>
+          <span>TVL</span><b>${p.tvl ? usd(p.tvl) : '—'}</b>
+          <span>Auditorías</span><b>${p.au ? `${p.au.n} · ${esc(p.au.by.join(', '))}${p.au.at ? ` · última ${esc(p.au.at)}` : ''}` : 'sin registro'}</b>
+          <span>Repositorios</span><b>${p.r || '—'}</b>
+        </div>
+        <a class="u-link" href="${projectUrl(p.s)}" target="_blank" rel="noopener">Ficha completa en Stellar Light ↗</a>
+        ${similar.length ? `<h4 class="u-h4">Parecidos en esta galaxia</h4>${similar.map(({ q, i }) => `<button class="u-opt" data-star="${i}">${esc(q.n)}<small> · ${q.scf ? 'SCF ' + usd(q.scf) : STATUS_INFO[q.st].label}</small></button>`).join('')}` : ''}
+        <p class="u-note">"Sin registro" significa que la fuente no tiene el dato, no que no exista. Datos del ${new Date(a.generatedAt).toLocaleDateString('es')}.</p>`;
+    }
+    this.panel.innerHTML = html;
+    this.panel.classList.add('on');
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-star]').forEach(b => b.addEventListener('click', () => this.ev.onFlyToStar('project', Number(b.dataset.star))));
+  }
+
+  private toggleObservatory() {
+    if (!this.atlas) return;
+    const m = this.$('#u-modal');
+    if (m.classList.contains('on')) { this.closeModal(); return; }
+    const root = this.openModal(observatoryHtml(this.atlas, this.w.visited?.length ?? 0));
+    const card = root.querySelector<HTMLElement>('.u-card')!;
+    card.classList.add('wide');
+    wireObservatory(card, (kind, index) => { this.closeModal(); this.ev.onFlyToStar(kind, index); });
+  }
+
   private tabs(ids: string[], labels: string[]): string {
     if (!ids.includes(this.tab)) this.tab = ids[0];
     return `<div class="u-tabs">${ids.map((id, i) => `<button data-tab="${id}" class="${id === this.tab ? 'on' : ''}">${labels[i]}</button>`).join('')}</div>`;
@@ -246,6 +364,7 @@ export class WorldHud {
     p.querySelectorAll<HTMLButtonElement>('[data-fill]').forEach(b => b.addEventListener('click', () => this.act(fulfillOrder(this.w, Number(b.dataset.fill)))));
     p.querySelectorAll<HTMLButtonElement>('[data-source]').forEach(b => b.addEventListener('click', () => this.sourceOrder(Number(b.dataset.source))));
     p.querySelector('#u-launch')?.addEventListener('click', () => this.ev.onLaunch(this.w.sectors.find(x => x.id === n.sector)!));
+    p.querySelector('#u-open-obs')?.addEventListener('click', () => this.toggleObservatory());
   }
 
   /** compra lo que falta para un encargo con un path payment desde el activo con el que salga más barato */

@@ -9,6 +9,7 @@ import { Hud } from './ui/hud';
 import { Input } from './ui/input';
 import { consumeLoadout, loadWorld, saveWorld, settleMatch, tickLedger, type MatchLoadout, type Sector, type WorldState } from './world/economy';
 import { WorldHud } from './world/hud';
+import type { RavenSnapshot } from './world/atlas';
 import { Universe } from './world/universe';
 
 const LOCAL: Side = 0;
@@ -57,13 +58,18 @@ function showLobby() {
     diff = b.dataset.d as Difficulty;
   }));
   d.querySelector('#go-match')!.addEventListener('click', () => { d.remove(); start(diff); });
-  d.querySelector('#go-universe')!.addEventListener('click', () => { d.remove(); enterUniverse(); });
+  d.querySelector('#go-universe')!.addEventListener('click', () => { d.remove(); void enterUniverse(); });
   app.appendChild(d);
 }
 
-function enterUniverse() {
+async function loadAtlas(): Promise<RavenSnapshot | null> {
+  try { return (await import('./world/data/raven.json')).default as unknown as RavenSnapshot; } catch { return null; }
+}
+
+async function enterUniverse() {
   demoView?.dispose();
   demoView = null;
+  const atlas = await loadAtlas();
   const world = loadWorld();
   const save = () => saveWorld(world);
   // el universo se crea primero: el HUD puede abrir la ayuda (y congelar la nave) al construirse
@@ -71,13 +77,15 @@ function enterUniverse() {
   const universe = new Universe(space, world, app, {
     onNode: n => hud?.setNode(n),
     onGalaxy: g => hud?.setGalaxy(g),
-  });
+    onStar: st => hud?.setStar(st),
+  }, atlas);
   hud = new WorldHud(app, world, {
     onChange: () => { save(); universe.refresh(); },
     onLaunch: sector => launch(sector),
     onQuickMatch: () => launch(null),
     setFrozen: f => { universe.frozen = f; },
-  });
+    onFlyToStar: (kind, index) => universe.flyToStar(kind, index),
+  }, atlas);
   cosmos = { world, universe, hud, ledgerAcc: 0 };
   // solo en desarrollo: acceso desde la consola para probar (p. ej. __cosmos.universe.flyTo(...))
   if (import.meta.env.DEV) (window as unknown as { __cosmos: Cosmos }).__cosmos = cosmos;
@@ -227,5 +235,5 @@ space.rig.lookAt(-120, 100);
 space.rig.zoom(1.3);
 let returning = false;
 try { returning = sessionStorage.getItem(RETURN_KEY) === '1'; sessionStorage.removeItem(RETURN_KEY); } catch { /* sin almacenamiento */ }
-if (returning) enterUniverse(); else showLobby();
+if (returning) void enterUniverse(); else showLobby();
 requestAnimationFrame(frame);

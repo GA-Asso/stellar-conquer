@@ -58,6 +58,8 @@ export interface WorldState {
   orders: Order[];
   sectors: Sector[];
   discovered: string[];
+  /** proyectos del atlas que la nave ya visitó (slugs) */
+  visited?: string[];
   stats: { burned: number; treasury: number; swaps: number; orders: number; wins: number; losses: number };
   nextId: number;
   log: string[];
@@ -353,6 +355,17 @@ export function discover(w: WorldState, nodeId: string, reward: { asset: Asset; 
   w.wallet[reward.asset] = round(w.wallet[reward.asset] + reward.amount);
   note(w, `Nodo descubierto: +${reward.amount} ${reward.asset}`);
   return { ok: true, msg: `¡Nodo descubierto! +${reward.amount} ${reward.asset}` };
+}
+
+/** recompensa por visitar por primera vez un proyecto del atlas */
+export const VISIT_XLM = 0.2;
+
+export function visitProject(w: WorldState, slug: string): boolean {
+  w.visited ??= [];
+  if (w.visited.includes(slug)) return false;
+  w.visited.push(slug);
+  w.wallet.XLM = round(w.wallet.XLM + VISIT_XLM);
+  return true;
 }
 
 export interface MatchLoadout { interceptors: number; mechas: number; bonus: { lumens: number; metal: number } }
