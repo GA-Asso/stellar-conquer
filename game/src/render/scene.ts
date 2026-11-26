@@ -15,6 +15,8 @@ export class OrbitRig {
   yaw = Math.PI * 0.25;
   pitch = 0.95;
   distance = 190;
+  /** hasta dónde puede alejarse el punto de mira del origen (el universo es mayor que una partida) */
+  bound = MAP_HALF + 20;
   private goal = { yaw: this.yaw, pitch: this.pitch, distance: this.distance, target: this.target.clone() };
 
   constructor(public camera: THREE.PerspectiveCamera) {}
@@ -35,7 +37,7 @@ export class OrbitRig {
   }
   lookAt(x: number, z: number) { this.goal.target.set(x, 0, z); this.clampTarget(); }
   private clampTarget() {
-    const m = MAP_HALF + 20;
+    const m = this.bound;
     this.goal.target.x = THREE.MathUtils.clamp(this.goal.target.x, -m, m);
     this.goal.target.z = THREE.MathUtils.clamp(this.goal.target.z, -m, m);
   }
