@@ -38,6 +38,11 @@ pub struct Config {
     pub daily_budget: i128,
     /// tope por jugador y día
     pub player_cap: i128,
+    /// parte del presupuesto diario que pueden cobrar las partidas contra la IA
+    /// (las cuentas son gratis: sin este tope, cuentas falsas vaciarían el fondo jugando contra la IA)
+    pub ai_daily_budget: i128,
+    /// fianza en STAR para impugnar; se devuelve si la impugnación prospera y va al fondo si no
+    pub dispute_bond: i128,
 }
 
 #[contracttype]
@@ -68,6 +73,7 @@ pub struct Match {
     pub result: MatchResult,
     pub ready_at: u64,
     pub status: Status,
+    pub challenger: Option<Address>,
 }
 
 #[contracttype]
@@ -86,6 +92,7 @@ enum Key {
     Match(BytesN<32>),
     Stats(Address),
     Spent(u64),
+    SpentAi(u64),
     PlayerDay(Address, u64),
     Pair(Address, Address, u64),
 }
@@ -169,13 +176,17 @@ fn budget_for(env: &Env, c: &Config, day: u64) -> i128 {
 }
 
 /// cuánto cobraría `player` hoy con una recompensa base `base`, y su contador del día
-fn quote_inner(env: &Env, c: &Config, player: &Address, base: i128) -> (i128, u32, i128, u64) {
+fn quote_inner(env: &Env, c: &Config, player: &Address, base: i128, vs_ai: bool) -> (i128, u32, i128, u64) {
     let day = env.ledger().timestamp() / DAY;
     let (count, paid): (u32, i128) =
         env.storage().temporary().get(&Key::PlayerDay(player.clone(), day)).unwrap_or((0, 0));
     let spent: i128 = env.storage().temporary().get(&Key::Spent(day)).unwrap_or(0);
     let mut amt = base * factor_bps(count) / 10_000;
     amt = amt.min(c.player_cap - paid).min(budget_for(env, c, day) - spent);
+    if vs_ai {
+        let spent_ai: i128 = env.storage().temporary().get(&Key::SpentAi(day)).unwrap_or(0);
+        amt = amt.min(c.ai_daily_budget - spent_ai);
+    }
     let bal = token::TokenClient::new(env, &c.token).balance(&env.current_contract_address());
     (amt.min(bal).max(0), count, paid, day)
 }
@@ -202,13 +213,15 @@ impl Conquest {
 
         let ready_at = env.ledger().timestamp() + c.window;
         Reported { match_id: result.match_id.clone(), winner: result.winner.clone(), ready_at }.publish(&env);
-        save(&env, &Match { result, ready_at, status: Status::Pending });
+        save(&env, &Match { result, ready_at, status: Status::Pending, challenger: None });
         Ok(ready_at)
     }
 
-    /// Impugna un resultado dentro de la ventana. El árbitro re-simula y llama `resolve`.
+    /// Impugna un resultado dentro de la ventana depositando la fianza. El árbitro re-simula y llama
+    /// `resolve`. La fianza evita que alguien congele todas las recompensas impugnando gratis.
     pub fn dispute(env: Env, challenger: Address, match_id: BytesN<32>) -> Result<(), Error> {
         challenger.require_auth();
+        let c = cfg(&env);
         let mut m = load(&env, &match_id)?;
         if m.status != Status::Pending {
             return Err(Error::BadStatus);
@@ -216,14 +229,21 @@ impl Conquest {
         if env.ledger().timestamp() >= m.ready_at {
             return Err(Error::WindowClosed);
         }
+        if c.dispute_bond > 0 {
+            token::TokenClient::new(&env, &c.token).transfer(&challenger, &env.current_contract_address(), &c.dispute_bond);
+        }
         m.status = Status::Disputed;
+        m.challenger = Some(challenger.clone());
         save(&env, &m);
         Disputed { match_id, challenger }.publish(&env);
         Ok(())
     }
 
+    /// `valid = true`: el resultado era correcto, la fianza se queda en el fondo de recompensas.
+    /// `valid = false`: la impugnación prospera, se rechaza el resultado y se devuelve la fianza.
     pub fn resolve(env: Env, match_id: BytesN<32>, valid: bool) -> Result<(), Error> {
-        cfg(&env).admin.require_auth();
+        let c = cfg(&env);
+        c.admin.require_auth();
         let mut m = load(&env, &match_id)?;
         if m.status != Status::Disputed {
             return Err(Error::BadStatus);
@@ -233,6 +253,9 @@ impl Conquest {
             m.ready_at = env.ledger().timestamp();
         } else {
             m.status = Status::Rejected;
+            if let (Some(ch), true) = (&m.challenger, c.dispute_bond > 0) {
+                token::TokenClient::new(&env, &c.token).transfer(&env.current_contract_address(), ch, &c.dispute_bond);
+            }
         }
         save(&env, &m);
         Ok(())
@@ -265,13 +288,19 @@ impl Conquest {
             let mut ls: Stats = env.storage().persistent().get(&lk).unwrap_or_default();
             ls.losses += 1;
             env.storage().persistent().set(&lk, &ls);
+            env.storage().persistent().extend_ttl(&lk, MATCH_TTL / 2, MATCH_TTL);
         }
 
-        let (amount, count, paid, day) = quote_inner(&env, &c, &r.winner, base);
+        let vs_ai = r.loser.is_none();
+        let (amount, count, paid, day) = quote_inner(&env, &c, &r.winner, base, vs_ai);
         temp_set(&env, &Key::PlayerDay(r.winner.clone(), day), &(count + 1, paid + amount));
         if amount > 0 {
             let spent: i128 = env.storage().temporary().get(&Key::Spent(day)).unwrap_or(0);
             temp_set(&env, &Key::Spent(day), &(spent + amount));
+            if vs_ai {
+                let spent_ai: i128 = env.storage().temporary().get(&Key::SpentAi(day)).unwrap_or(0);
+                temp_set(&env, &Key::SpentAi(day), &(spent_ai + amount));
+            }
             token::TokenClient::new(&env, &c.token).transfer(&env.current_contract_address(), &r.winner, &amount);
         }
 
@@ -291,7 +320,7 @@ impl Conquest {
     pub fn quote(env: Env, player: Address, vs_ai: bool) -> i128 {
         let c = cfg(&env);
         let base = if vs_ai { c.base_ai } else { c.base_pvp };
-        quote_inner(&env, &c, &player, base).0
+        quote_inner(&env, &c, &player, base, vs_ai).0
     }
 
     pub fn daily_budget(env: Env) -> i128 {

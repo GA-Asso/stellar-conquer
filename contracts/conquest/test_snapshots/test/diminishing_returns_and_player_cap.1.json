@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 5,
+    "address": 13,
     "nonce": 0,
     "mux_id": 0
   },
@@ -62,20 +62,12 @@
     [],
     [],
     [],
-    [],
-    [],
-    [],
-    [],
-    [],
-    [],
-    [],
-    [],
     []
   ],
   "ledger": {
     "protocol_version": 25,
     "sequence_number": 0,
-    "timestamp": 86407200,
+    "timestamp": 86404800,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -165,6 +157,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -197,7 +195,9 @@
                           "key": {
                             "symbol": "loser"
                           },
-                          "val": "void"
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                          }
                         },
                         {
                           "key": {
@@ -276,6 +276,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -308,7 +314,9 @@
                           "key": {
                             "symbol": "loser"
                           },
-                          "val": "void"
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
+                          }
                         },
                         {
                           "key": {
@@ -387,6 +395,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -419,7 +433,9 @@
                           "key": {
                             "symbol": "loser"
                           },
-                          "val": "void"
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
+                          }
                         },
                         {
                           "key": {
@@ -498,6 +514,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -530,7 +552,9 @@
                           "key": {
                             "symbol": "loser"
                           },
-                          "val": "void"
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                          }
                         },
                         {
                           "key": {
@@ -609,6 +633,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -641,7 +671,9 @@
                           "key": {
                             "symbol": "loser"
                           },
-                          "val": "void"
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5"
+                          }
                         },
                         {
                           "key": {
@@ -720,6 +752,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -752,7 +790,9 @@
                           "key": {
                             "symbol": "loser"
                           },
-                          "val": "void"
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N"
+                          }
                         },
                         {
                           "key": {
@@ -831,6 +871,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -863,7 +909,9 @@
                           "key": {
                             "symbol": "loser"
                           },
-                          "val": "void"
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                          }
                         },
                         {
                           "key": {
@@ -942,6 +990,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -974,7 +1028,9 @@
                           "key": {
                             "symbol": "loser"
                           },
-                          "val": "void"
+                          "val": {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2ZMN"
+                          }
                         },
                         {
                           "key": {
@@ -1041,106 +1097,28 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "Match"
+                    "symbol": "Pair"
                   },
                   {
-                    "bytes": "1212121212121212121212121212121212121212121212121212121212121212"
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                  },
+                  {
+                    "u64": "1000"
                   }
                 ]
               },
-              "durability": "persistent",
+              "durability": "temporary",
               "val": {
-                "map": [
-                  {
-                    "key": {
-                      "symbol": "ready_at"
-                    },
-                    "val": {
-                      "u64": "86405400"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "result"
-                    },
-                    "val": {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "ledgers"
-                          },
-                          "val": {
-                            "u32": 200
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "log_hash"
-                          },
-                          "val": {
-                            "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "loser"
-                          },
-                          "val": "void"
-                        },
-                        {
-                          "key": {
-                            "symbol": "match_id"
-                          },
-                          "val": {
-                            "bytes": "1212121212121212121212121212121212121212121212121212121212121212"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "seed"
-                          },
-                          "val": {
-                            "u64": "18"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "state_hash"
-                          },
-                          "val": {
-                            "bytes": "0202020202020202020202020202020202020202020202020202020202020202"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "winner"
-                          },
-                          "val": {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "status"
-                    },
-                    "val": {
-                      "vec": [
-                        {
-                          "symbol": "Claimed"
-                        }
-                      ]
-                    }
-                  }
-                ]
+                "bool": true
               }
             }
           },
           "ext": "v0"
         },
-        "live_until": 518400
+        "live_until": 34560
       },
       {
         "entry": {
@@ -1152,106 +1130,28 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "Match"
+                    "symbol": "Pair"
                   },
                   {
-                    "bytes": "1313131313131313131313131313131313131313131313131313131313131313"
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
+                  },
+                  {
+                    "u64": "1000"
                   }
                 ]
               },
-              "durability": "persistent",
+              "durability": "temporary",
               "val": {
-                "map": [
-                  {
-                    "key": {
-                      "symbol": "ready_at"
-                    },
-                    "val": {
-                      "u64": "86406000"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "result"
-                    },
-                    "val": {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "ledgers"
-                          },
-                          "val": {
-                            "u32": 200
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "log_hash"
-                          },
-                          "val": {
-                            "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "loser"
-                          },
-                          "val": "void"
-                        },
-                        {
-                          "key": {
-                            "symbol": "match_id"
-                          },
-                          "val": {
-                            "bytes": "1313131313131313131313131313131313131313131313131313131313131313"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "seed"
-                          },
-                          "val": {
-                            "u64": "19"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "state_hash"
-                          },
-                          "val": {
-                            "bytes": "0202020202020202020202020202020202020202020202020202020202020202"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "winner"
-                          },
-                          "val": {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "status"
-                    },
-                    "val": {
-                      "vec": [
-                        {
-                          "symbol": "Claimed"
-                        }
-                      ]
-                    }
-                  }
-                ]
+                "bool": true
               }
             }
           },
           "ext": "v0"
         },
-        "live_until": 518400
+        "live_until": 34560
       },
       {
         "entry": {
@@ -1263,106 +1163,28 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "Match"
+                    "symbol": "Pair"
                   },
                   {
-                    "bytes": "1414141414141414141414141414141414141414141414141414141414141414"
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
+                  },
+                  {
+                    "u64": "1000"
                   }
                 ]
               },
-              "durability": "persistent",
+              "durability": "temporary",
               "val": {
-                "map": [
-                  {
-                    "key": {
-                      "symbol": "ready_at"
-                    },
-                    "val": {
-                      "u64": "86406600"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "result"
-                    },
-                    "val": {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "ledgers"
-                          },
-                          "val": {
-                            "u32": 200
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "log_hash"
-                          },
-                          "val": {
-                            "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "loser"
-                          },
-                          "val": "void"
-                        },
-                        {
-                          "key": {
-                            "symbol": "match_id"
-                          },
-                          "val": {
-                            "bytes": "1414141414141414141414141414141414141414141414141414141414141414"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "seed"
-                          },
-                          "val": {
-                            "u64": "20"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "state_hash"
-                          },
-                          "val": {
-                            "bytes": "0202020202020202020202020202020202020202020202020202020202020202"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "winner"
-                          },
-                          "val": {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "status"
-                    },
-                    "val": {
-                      "vec": [
-                        {
-                          "symbol": "Claimed"
-                        }
-                      ]
-                    }
-                  }
-                ]
+                "bool": true
               }
             }
           },
           "ext": "v0"
         },
-        "live_until": 518400
+        "live_until": 34560
       },
       {
         "entry": {
@@ -1374,106 +1196,160 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "Match"
+                    "symbol": "Pair"
                   },
                   {
-                    "bytes": "1515151515151515151515151515151515151515151515151515151515151515"
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                  },
+                  {
+                    "u64": "1000"
                   }
                 ]
               },
-              "durability": "persistent",
+              "durability": "temporary",
               "val": {
-                "map": [
-                  {
-                    "key": {
-                      "symbol": "ready_at"
-                    },
-                    "val": {
-                      "u64": "86407200"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "result"
-                    },
-                    "val": {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "ledgers"
-                          },
-                          "val": {
-                            "u32": 200
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "log_hash"
-                          },
-                          "val": {
-                            "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "loser"
-                          },
-                          "val": "void"
-                        },
-                        {
-                          "key": {
-                            "symbol": "match_id"
-                          },
-                          "val": {
-                            "bytes": "1515151515151515151515151515151515151515151515151515151515151515"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "seed"
-                          },
-                          "val": {
-                            "u64": "21"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "state_hash"
-                          },
-                          "val": {
-                            "bytes": "0202020202020202020202020202020202020202020202020202020202020202"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "winner"
-                          },
-                          "val": {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "status"
-                    },
-                    "val": {
-                      "vec": [
-                        {
-                          "symbol": "Claimed"
-                        }
-                      ]
-                    }
-                  }
-                ]
+                "bool": true
               }
             }
           },
           "ext": "v0"
         },
-        "live_until": 518400
+        "live_until": 34560
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Pair"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5"
+                  },
+                  {
+                    "u64": "1000"
+                  }
+                ]
+              },
+              "durability": "temporary",
+              "val": {
+                "bool": true
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 34560
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Pair"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N"
+                  },
+                  {
+                    "u64": "1000"
+                  }
+                ]
+              },
+              "durability": "temporary",
+              "val": {
+                "bool": true
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 34560
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Pair"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  },
+                  {
+                    "u64": "1000"
+                  }
+                ]
+              },
+              "durability": "temporary",
+              "val": {
+                "bool": true
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 34560
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Pair"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2ZMN"
+                  },
+                  {
+                    "u64": "1000"
+                  }
+                ]
+              },
+              "durability": "temporary",
+              "val": {
+                "bool": true
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 34560
       },
       {
         "entry": {
@@ -1499,10 +1375,10 @@
               "val": {
                 "vec": [
                   {
-                    "u32": 12
+                    "u32": 8
                   },
                   {
-                    "i128": "550000000"
+                    "i128": "2000000000"
                   }
                 ]
               }
@@ -1531,7 +1407,7 @@
               },
               "durability": "temporary",
               "val": {
-                "i128": "550000000"
+                "i128": "2000000000"
               }
             }
           },
@@ -1564,7 +1440,7 @@
                       "symbol": "earned"
                     },
                     "val": {
-                      "i128": "550000000"
+                      "i128": "2000000000"
                     }
                   },
                   {
@@ -1580,7 +1456,423 @@
                       "symbol": "wins"
                     },
                     "val": {
-                      "u32": 12
+                      "u32": 8
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 518400
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Stats"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "earned"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "losses"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "wins"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 518400
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Stats"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "earned"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "losses"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "wins"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 518400
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Stats"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "earned"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "losses"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "wins"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 518400
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Stats"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "earned"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "losses"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "wins"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 518400
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Stats"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "earned"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "losses"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "wins"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 518400
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Stats"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "earned"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "losses"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "wins"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 518400
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Stats"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "earned"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "losses"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "wins"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 518400
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Stats"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2ZMN"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "earned"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "losses"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "wins"
+                    },
+                    "val": {
+                      "u32": 0
                     }
                   }
                 ]
@@ -1626,6 +1918,14 @@
                           },
                           {
                             "key": {
+                              "symbol": "ai_daily_budget"
+                            },
+                            "val": {
+                              "i128": "250000000"
+                            }
+                          },
+                          {
+                            "key": {
                               "symbol": "base_ai"
                             },
                             "val": {
@@ -1646,6 +1946,14 @@
                             },
                             "val": {
                               "i128": "547940000000"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "dispute_bond"
+                            },
+                            "val": {
+                              "i128": "1000000000"
                             }
                           },
                           {
@@ -1729,7 +2037,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "9999450000000"
+                      "i128": "9998000000000"
                     }
                   },
                   {
@@ -1781,7 +2089,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "550000000"
+                      "i128": "2000000000"
                     }
                   },
                   {
@@ -1940,7 +2248,7 @@
                 "symbol": "claimed"
               },
               {
-                "bytes": "1515151515151515151515151515151515151515151515151515151515151515"
+                "bytes": "1111111111111111111111111111111111111111111111111111111111111111"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"

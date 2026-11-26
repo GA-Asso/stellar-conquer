@@ -33,10 +33,16 @@ fn setup() -> T {
         base_ai: 10 * STAR,
         daily_budget: 54_794 * STAR,
         player_cap: 200 * STAR,
+        ai_daily_budget: 25 * STAR,
+        dispute_bond: 100 * STAR,
     };
     let id = env.register(Conquest, (cfg,));
     StellarAssetClient::new(&env, &star).mint(&id, &(1_000_000 * STAR));
     T { env, id, star, key }
+}
+
+fn fund(t: &T, who: &Address, amount: i128) {
+    StellarAssetClient::new(&t.env, &t.star).mint(who, &amount);
 }
 
 fn result(t: &T, n: u8, winner: &Address, loser: Option<Address>) -> MatchResult {
@@ -108,12 +114,58 @@ fn dispute_blocks_until_resolved() {
     let a = Address::generate(&t.env);
     let r = result(&t, 1, &a, None);
     c.report(&r, &sign(&t, &r));
-    c.dispute(&Address::generate(&t.env), &r.match_id);
+    let ch = Address::generate(&t.env);
+    fund(&t, &ch, 100 * STAR);
+    c.dispute(&ch, &r.match_id);
+    let star = TokenClient::new(&t.env, &t.star);
+    assert_eq!(star.balance(&ch), 0);
     advance(&t, 600);
     assert_eq!(c.try_claim(&r.match_id), Err(Ok(Error::BadStatus)));
     c.resolve(&r.match_id, &false);
     assert_eq!(c.get_match(&r.match_id).unwrap().status, Status::Rejected);
     assert_eq!(c.stats(&a).wins, 0);
+    // la impugnación prosperó: se devuelve la fianza
+    assert_eq!(star.balance(&ch), 100 * STAR);
+}
+
+#[test]
+fn failed_dispute_forfeits_bond_and_needs_funds() {
+    let t = setup();
+    let c = ConquestClient::new(&t.env, &t.id);
+    let (a, b) = (Address::generate(&t.env), Address::generate(&t.env));
+    let r = result(&t, 1, &a, Some(b));
+    c.report(&r, &sign(&t, &r));
+    // sin fianza no se puede impugnar
+    assert!(c.try_dispute(&Address::generate(&t.env), &r.match_id).is_err());
+    let ch = Address::generate(&t.env);
+    fund(&t, &ch, 100 * STAR);
+    c.dispute(&ch, &r.match_id);
+    c.resolve(&r.match_id, &true);
+    // el resultado era bueno: la fianza se queda en el fondo y el ganador cobra
+    assert_eq!(TokenClient::new(&t.env, &t.star).balance(&ch), 0);
+    assert_eq!(c.claim(&r.match_id), 50 * STAR);
+}
+
+#[test]
+fn ai_rewards_share_a_global_daily_cap() {
+    let t = setup();
+    let c = ConquestClient::new(&t.env, &t.id);
+    let mut total = 0;
+    // cuentas nuevas contra la IA: entre todas no pasan de 25 STAR al día
+    for n in 0..5u8 {
+        let p = Address::generate(&t.env);
+        let r = result(&t, n + 1, &p, None);
+        c.report(&r, &sign(&t, &r));
+        advance(&t, 600);
+        total += c.claim(&r.match_id);
+    }
+    assert_eq!(total, 25 * STAR);
+    // el PvP no consume ese tope
+    let (a, b) = (Address::generate(&t.env), Address::generate(&t.env));
+    let r = result(&t, 50, &a, Some(b));
+    c.report(&r, &sign(&t, &r));
+    advance(&t, 600);
+    assert_eq!(c.claim(&r.match_id), 50 * STAR);
 }
 
 #[test]
@@ -122,14 +174,14 @@ fn diminishing_returns_and_player_cap() {
     let c = ConquestClient::new(&t.env, &t.id);
     let a = Address::generate(&t.env);
     let mut paid = std::vec::Vec::new();
-    for n in 0..12u8 {
-        // contra la IA: 10 STAR base
-        let r = result(&t, n + 10, &a, None);
+    for n in 0..8u8 {
+        // PvP contra rivales distintos: 50 STAR base, tope de 200 al día
+        let r = result(&t, n + 10, &a, Some(Address::generate(&t.env)));
         c.report(&r, &sign(&t, &r));
         advance(&t, 600);
         paid.push(c.claim(&r.match_id) / STAR);
     }
-    assert_eq!(paid[..12], [10, 10, 10, 5, 5, 5, 2, 2, 2, 2, 0, 0]);
+    assert_eq!(paid[..8], [50, 50, 50, 25, 25, 0, 0, 0]);
 }
 
 #[test]

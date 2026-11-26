@@ -144,6 +144,12 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "challenger"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "ready_at"
                     },
                     "val": {
@@ -268,6 +274,14 @@
                           },
                           {
                             "key": {
+                              "symbol": "ai_daily_budget"
+                            },
+                            "val": {
+                              "i128": "250000000"
+                            }
+                          },
+                          {
+                            "key": {
                               "symbol": "base_ai"
                             },
                             "val": {
@@ -288,6 +302,14 @@
                             },
                             "val": {
                               "i128": "547940000000"
+                            }
+                          },
+                          {
+                            "key": {
+                              "symbol": "dispute_bond"
+                            },
+                            "val": {
+                              "i128": "1000000000"
                             }
                           },
                           {

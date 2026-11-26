@@ -71,7 +71,8 @@ echo "$ARMORY"
 say "Conquest"
 CONQUEST=$(stellar contract deploy --wasm "$WASM/conquest.wasm" --source "$ADMIN" "${net[@]}" -- \
   --config "{\"admin\":\"$ADMIN_G\",\"token\":\"$STAR\",\"verifier\":\"$VERIFIER_HEX\",\"window\":${DISPUTE_WINDOW:-600},\
-\"base_pvp\":\"$((50 * STROOPS))\",\"base_ai\":\"$((10 * STROOPS))\",\"daily_budget\":\"$((54794 * STROOPS))\",\"player_cap\":\"$((200 * STROOPS))\"}")
+\"base_pvp\":\"$((50 * STROOPS))\",\"base_ai\":\"$((10 * STROOPS))\",\"daily_budget\":\"$((54794 * STROOPS))\",\"player_cap\":\"$((200 * STROOPS))\",\
+\"ai_daily_budget\":\"$((5000 * STROOPS))\",\"dispute_bond\":\"$((100 * STROOPS))\"}")
 echo "$CONQUEST"
 
 say "Vault"

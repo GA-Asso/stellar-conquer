@@ -75,6 +75,10 @@ Reparto de STAR en el despliegue: 40 M al fondo de recompensas (saldo del contra
 
 Reglas: 50 STAR por victoria PvP y 10 contra la IA. Presupuesto global de 54.794 STAR al día el
 primer año, que se divide a la mitad cada 365 días. Tope de 200 STAR por jugador al día.
+Las partidas contra la IA comparten un tope global de 5.000 STAR al día: las cuentas son gratis y,
+sin ese tope, cuentas falsas podrían vaciar el fondo jugando contra la IA.
+Impugnar exige una fianza de 100 STAR: se devuelve si la impugnación prospera y pasa al fondo si no,
+para que nadie pueda congelar las recompensas impugnando gratis.
 Rendimientos decrecientes: de la 1.ª a la 3.ª recompensa del día 100 %, de la 4.ª a la 6.ª 50 %,
 de la 7.ª a la 10.ª 25 %, después 0. Una sola recompensa al día por pareja de rivales.
 
@@ -104,7 +108,7 @@ recurso al día entre todos los jugadores.
 
 ```bash
 cd contracts
-cargo test                 # 16 pruebas
+cargo test                 # 18 pruebas
 stellar contract build     # WASM en target/wasm32v1-none/release
 
 cd ..
