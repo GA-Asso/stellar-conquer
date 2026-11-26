@@ -1,4 +1,4 @@
-// Escena espacial: cámara orbital, nebulosa procedural, polvo con paralaje y bloom.
+// Escena espacial: cámara orbital, nebulosa procedural y bloom (sin campos de estrellas).
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -90,22 +90,6 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-// polvo estelar cercano: le da paralaje a la cámara al girar
-function makeDust(): THREE.Points {
-  const n = 1800;
-  const pos = new Float32Array(n * 3);
-  let st = 99;
-  const rnd = () => { st = (st * 16807) % 2147483647; return st / 2147483647; };
-  for (let i = 0; i < n; i++) {
-    pos.set([(rnd() * 2 - 1) * MAP_HALF * 1.3, -30 - rnd() * 120, (rnd() * 2 - 1) * MAP_HALF * 1.3], i * 3);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  return new THREE.Points(g, new THREE.PointsMaterial({
-    size: 1.1, color: 0x9fa8ff, transparent: true, opacity: 0.55, depthWrite: false,
-  }));
-}
-
 export interface SpaceScene {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -138,7 +122,6 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(2800, 48, 32), nebula);
   sky.renderOrder = -10;
   scene.add(sky);
-  scene.add(makeDust());
 
   // sol lejano: luz principal y un halo que el bloom hace brillar
   const sun = new THREE.DirectionalLight(0xfff1d0, 1.8);
