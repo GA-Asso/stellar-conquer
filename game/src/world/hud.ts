@@ -51,7 +51,7 @@ export class WorldHud {
         <div class="brand"><span class="logo"></span>STELLAR<b>UNIVERSO</b></div>
         <div class="u-wallet" id="u-wallet"></div>
         <div class="u-progress" id="u-progress"></div>
-        <div class="u-mode" title="La economía corre en tu navegador con las mismas reglas que los contratos. El siguiente paso es firmar con Freighter en testnet.">Simulación local · testnet en camino</div>
+        <div class="u-mode" title="Conquest, Armory y Vault ya están desplegados en testnet. Por ahora la economía corre en tu navegador con las mismas reglas; el siguiente paso es firmar con Freighter.">Contratos en testnet</div>
         <button class="u-btn" id="u-obs">Observatorio <kbd>O</kbd></button>
         <button class="u-btn" id="u-inv">Inventario <kbd>I</kbd></button>
         <button class="u-btn" id="u-help">Ayuda <kbd>H</kbd></button>
