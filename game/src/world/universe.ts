@@ -6,6 +6,7 @@ import { buildUnit } from '../render/models';
 import { itemDef, type WorldState } from './economy';
 import { CURATED_INNER, CURATED_SLUGS, GALAXIES, NODES, galaxyOf, nodeSlug, nodeWorldPos, type Galaxy, type WorldNode } from './ecosystem';
 import { STATUS_INFO, layoutAtlas, type RavenSnapshot, type Star } from './atlas';
+import { Scenery, Trail, buildStructure, starGlow } from './spacecraft';
 
 const SHIP_SPEED = 170;
 const ARRIVE = 22;
@@ -19,7 +20,7 @@ export interface UniverseEvents {
   onStar(s: Star | null): void;
 }
 
-interface NodeView { node: WorldNode; obj: THREE.Group; core: THREE.Mesh; ring: THREE.Mesh; label: HTMLDivElement; pos: THREE.Vector3 }
+interface NodeView { node: WorldNode; obj: THREE.Group; core: THREE.Mesh; ring: THREE.Mesh; tick(t: number): void; label: HTMLDivElement; pos: THREE.Vector3 }
 
 let glowTex: THREE.Texture | null = null;
 function glow(): THREE.Texture {
@@ -52,14 +53,15 @@ function buildGalaxy(g: Galaxy): THREE.Group {
   const group = new THREE.Group();
   group.position.set(g.center[0], -18, g.center[1]);
   const col = new THREE.Color(g.color);
-  group.add(sprite(col.clone().multiplyScalar(1.4), g.radius * 0.9, 0.55));
-  group.add(sprite(new THREE.Color('#ffffff'), g.radius * 0.28, 0.5));
+  // halos tenues: dan el color de la galaxia sin deslavar las estaciones que hay dentro
+  group.add(sprite(col.clone().multiplyScalar(1.2), g.radius * 0.9, 0.3));
+  group.add(sprite(new THREE.Color('#ffffff'), g.radius * 0.22, 0.1));
   for (let arm = 0; arm < 2; arm++) {
     for (let i = 0; i < 12; i++) {
       const t = i / 12;
       const a = arm * Math.PI + t * Math.PI * 1.6;
       const r = g.radius * (0.18 + t * 0.85);
-      const s = sprite(col, g.radius * (0.55 - t * 0.3), 0.22 * (1 - t * 0.6));
+      const s = sprite(col, g.radius * (0.55 - t * 0.3), 0.15 * (1 - t * 0.6));
       s.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
       group.add(s);
     }
@@ -73,30 +75,6 @@ function buildGalaxy(g: Galaxy): THREE.Group {
   ring.position.y = 17;
   group.add(ring);
   return group;
-}
-
-function buildNode(n: WorldNode): { obj: THREE.Group; core: THREE.Mesh; ring: THREE.Mesh } {
-  const obj = new THREE.Group();
-  const col = new THREE.Color(galaxyOf(n.galaxy).color);
-  const service = n.kind === 'dex' || n.kind === 'market' || n.kind === 'trade' || n.kind === 'atlas';
-  let geo: THREE.BufferGeometry;
-  if (n.kind === 'frontier') geo = new THREE.OctahedronGeometry(9);
-  else if (service) geo = new THREE.SphereGeometry(9, 24, 16);
-  else geo = new THREE.IcosahedronGeometry(5.5, 0);
-  const core = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    color: col, emissive: col, emissiveIntensity: 0.6, roughness: 0.4, metalness: 0.3, flatShading: !service,
-  }));
-  obj.add(core);
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(service ? 16 : 10, service ? 1.1 : 0.5, 8, 64),
-    new THREE.MeshBasicMaterial({ color: service ? new THREE.Color('#fdda24').multiplyScalar(2) : col, transparent: true, opacity: 0.8 }),
-  );
-  ring.rotation.x = Math.PI / 2.3;
-  obj.add(ring);
-  obj.add(sprite(col, service ? 48 : 26, 0.35));
-  const [x, z] = nodeWorldPos(n);
-  obj.position.set(x, 0, z);
-  return { obj, core, ring };
 }
 
 export class Universe {
@@ -120,6 +98,9 @@ export class Universe {
   private nearLabels: HTMLDivElement[] = [];
   private hoverLabel: HTMLDivElement;
   private currentStar: Star | null = null;
+  private scenery: Scenery;
+  private trail = new Trail();
+  private glowTick: ((t: number) => void) | null = null;
   frozen = false;
 
   constructor(private space: SpaceScene, private world: WorldState, host: HTMLElement, private ev: UniverseEvents, private atlas: RavenSnapshot | null = null) {
@@ -149,7 +130,7 @@ export class Universe {
       this.galaxyLabels.push({ g, el });
     }
     for (const n of NODES) {
-      const v = buildNode(n);
+      const v = buildStructure(n, galaxyOf(n.galaxy).color);
       this.root.add(v.obj);
       const label = document.createElement('div');
       label.className = 'u-label k-' + n.kind;
@@ -157,6 +138,8 @@ export class Universe {
       this.nodes.push({ node: n, ...v, label, pos: v.obj.position.clone() });
     }
 
+    this.scenery = new Scenery(GALAXIES, NODES);
+    this.root.add(this.scenery.group);
     this.buildStars();
     this.hoverLabel = document.createElement('div');
     this.hoverLabel.className = 'u-hover';
@@ -173,6 +156,8 @@ export class Universe {
     this.ship.scale.setScalar(2.4);
     this.ship.position.set(0, 4, 90);
     this.root.add(this.ship);
+    this.trail.reset(this.ship.position);
+    this.root.add(this.trail.points);
     this.refresh();
 
     space.rig.lookAt(0, 90);
@@ -188,7 +173,8 @@ export class Universe {
     const make = (kind: Star['kind'], geo: THREE.BufferGeometry) => {
       const list = this.stars.filter(s => s.kind === kind);
       if (!list.length) return;
-      const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff }), list.length);
+      // esferas con luz y un brillo propio suave: se leen como astros con volumen, no como discos planos
+      const mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.15, emissive: 0x1c2233 }), list.length);
       const col = new THREE.Color();
       list.forEach((st, i) => {
         pos.set(st.x, 0, st.z);
@@ -204,8 +190,16 @@ export class Universe {
       this.root.add(mesh);
       this.starMeshes.push({ mesh, kind, ids: list.map(s => this.stars.indexOf(s)) });
     };
-    make('project', new THREE.IcosahedronGeometry(1, 1));
+    make('project', new THREE.IcosahedronGeometry(1, 3));
     make('partner', new THREE.OctahedronGeometry(1.2));
+
+    // halo titilante de cada astro, del color de su estado
+    const colors = this.stars.map(st => st.kind === 'project'
+      ? new THREE.Color(STATUS_INFO[atlas.projects[st.index].st].color)
+      : new THREE.Color('#c9cbd6').multiplyScalar(0.7));
+    const glow = starGlow(this.stars, colors);
+    this.root.add(glow.points);
+    this.glowTick = glow.tick;
 
     // anillo para los proyectos con auditoría registrada
     const audited = this.stars.filter(s => s.kind === 'project' && atlas.projects[s.index].au);
@@ -276,6 +270,7 @@ export class Universe {
     if (!n) return;
     const [x, z] = nodeWorldPos(n);
     this.ship.position.set(x, 4, z + 6);
+    this.trail.reset(this.ship.position);
     this.autopilot = null;
     this.shipVel.set(0, 0, 0);
   }
@@ -397,10 +392,10 @@ export class Universe {
     rig.lookAt(this.ship.position.x, this.ship.position.z);
 
     for (const [i, grp] of this.galaxyGroups.entries()) grp.rotation.y = this.t * 0.02 * (i % 2 ? 1 : -1);
-    for (const v of this.nodes) {
-      v.ring.rotation.z = this.t * 0.4;
-      v.core.rotation.y = this.t * 0.6;
-    }
+    for (const v of this.nodes) v.tick(this.t);
+    this.scenery.update(dt, this.t);
+    this.glowTick?.(this.t);
+    this.trail.update(dt, this.ship.position, this.shipVel.length());
 
     // nodo y galaxia donde está la nave
     let near: NodeView | null = null, best = ARRIVE;
