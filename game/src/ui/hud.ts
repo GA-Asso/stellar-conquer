@@ -82,7 +82,7 @@ export class Hud {
         <div class="brand"><span class="logo"></span>STELLAR<b>CONQUER</b></div>
         <div class="res" data-tip="Lumens (XLM): se minan en asteroides con cristales dorados"><i class="ico l"></i><span id="r-l"></span></div>
         <div class="res" data-tip="Metal: se mina en asteroides cobrizos"><i class="ico m"></i><span id="r-m"></span></div>
-        <div class="res" data-tip="Energía: la generan los paneles solares"><i class="ico e"></i><span id="r-e"></span></div>
+        <div class="res" data-tip="Energía: la generan los paneles solares y se mina en cristales violetas"><i class="ico e"></i><span id="r-e"></span></div>
         <div class="res" data-tip="Población"><i class="ico p"></i><span id="r-p"></span></div>
         <div class="era" id="era"></div>
         <div class="stance" id="stance"></div>
@@ -102,9 +102,9 @@ export class Hud {
           <dt>Rueda / pellizco</dt><dd>Acercar y alejar</dd>
           <dt>Clic central o Alt + arrastrar</dt><dd>Girar e inclinar la galaxia en 3D (también Z / X / C / V)</dd>
           <dt>Flechas o bordes</dt><dd>Desplazar la cámara · clic en el minimapa para saltar</dd>
-          <dt>Espacio</dt><dd>Volver al Núcleo · <b>.</b> busca un dron ocioso</dd>
-          <dt>Ctrl + 1…9</dt><dd>Guardar grupo · 1…9 para recuperarlo</dd>
-          <dt>P</dt><dd>Pausa</dd>
+          <dt>Espacio</dt><dd>Volver al Núcleo · <b>.</b> busca un dron ocioso · <b>,</b> todo el ejército</dd>
+          <dt>Ctrl + 1…9</dt><dd>Guardar grupo · Shift + número lo amplía · 1…9 lo recupera (dos veces: centra la cámara)</dd>
+          <dt>P · + / −</dt><dd>Pausa · velocidad del juego (×0,5 a ×2)</dd>
         </dl>
       </details>
       <div class="tip" id="tip"></div>

@@ -603,6 +603,9 @@ function afterBuild(s: SimState, u: Unit, m: Module) {
     const a = nearestAsteroid(s, null, m.pos, 60);
     if (a) { u.order = { kind: 'gather', target: a.id, phase: 'go' }; u.lastField = { ...a.pos }; return; }
   }
+  // si venía de minar, vuelve a su campo en vez de quedarse ocioso
+  const back = u.lastField ? nearestAsteroid(s, null, u.lastField, 40) : null;
+  if (back) { u.order = { kind: 'gather', target: back.id, phase: 'go' }; return; }
   u.order = { kind: 'idle' };
 }
 
@@ -709,6 +712,10 @@ function stepModule(s: SimState, m: Module) {
     const a = q.item === 'drone' ? nearestAsteroid(s, null, m.rally, 10) : null;
     if (a) { u.order = { kind: 'gather', target: a.id, phase: 'go' }; u.lastField = { ...a.pos }; }
     else u.order = { kind: 'move', to: { ...m.rally }, aggressive: true };
+  } else if (q.item === 'drone') {
+    // sin punto de reunión, el dron nuevo se pone a minar solo el campo más cercano (ayuda a quien empieza)
+    const a = nearestAsteroid(s, null, m.pos, 110);
+    if (a) { u.order = { kind: 'gather', target: a.id, phase: 'go' }; u.lastField = { ...a.pos }; }
   }
 }
 

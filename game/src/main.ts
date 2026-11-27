@@ -180,6 +180,14 @@ function start(diff: Difficulty, ctx: MatchContext | null = null) {
   let hud: Hud;
   const input = new Input(space, view, () => game!.sim, LOCAL, send, k => {
     if (k === 'P') { paused = !paused; return true; }
+    // velocidad de juego, como en los RTS clásicos
+    if (k === '+' || k === '=' || k === '-') {
+      const steps = [0.5, 1, 1.5, 2];
+      const i = steps.indexOf(speed);
+      speed = steps[Math.max(0, Math.min(steps.length - 1, (i < 0 ? 1 : i) + (k === '-' ? -1 : 1)))];
+      hud.toast(`Velocidad ×${speed.toLocaleString('es')}`);
+      return true;
+    }
     return hud.hotkey(k === 'BACKSPACE' ? 'Backspace' : k);
   });
   window.addEventListener('keydown', e => { if (e.key === 'Backspace' && game) { hud.hotkey('Backspace'); e.preventDefault(); } });
@@ -192,7 +200,8 @@ function start(diff: Difficulty, ctx: MatchContext | null = null) {
   space.rig.lookAt(core.pos.x + 20, core.pos.z - 20);
   if (vitrina) { space.rig.lookAt(-70, 51); space.rig.zoom(0.5); }
   input.ui.selected.add(core.id);
-  hud.toast('Selecciona tus drones y mina los asteroides dorados (Lumens) y cobrizos (metal).', 'info');
+  hud.toast('Selecciona tus drones y mina los asteroides dorados (Lumens), cobrizos (metal) y los cristales violetas (energía).', 'info');
+  hud.toast('El rival está en paz: no atacará hasta que le dispares. Crece a tu ritmo.', 'good');
 }
 
 // los ítems quemados al despegar aportan unidades y recursos iniciales

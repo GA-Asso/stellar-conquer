@@ -272,13 +272,28 @@ export class Input {
     if (!down) { this.keys.delete(k); return; }
     this.keys.add(k);
     if (k === 'Escape') { this.ui.buildMode = null; this.ui.selected.clear(); return; }
-    if (/^[0-9]$/.test(k)) {
-      const n = Number(k);
+    // con Shift el teclado entrega símbolos (! " #…): se usa el código físico de la tecla
+    const digit = /^Digit[0-9]$/.test(e.code) ? Number(e.code.slice(5)) : /^[0-9]$/.test(k) ? Number(k) : -1;
+    if (digit >= 0) {
+      const n = digit;
       if (e.ctrlKey || e.metaKey) { e.preventDefault(); this.ui.groups.set(n, [...this.ui.selected]); return; }
+      if (e.shiftKey) {
+        // Shift + número: suma la selección al grupo
+        e.preventDefault();
+        this.ui.groups.set(n, [...new Set([...(this.ui.groups.get(n) ?? []), ...this.ui.selected])]);
+        return;
+      }
       const g = this.ui.groups.get(n);
-      if (g) { this.ui.selected = new Set(g.filter(id => this.getSim().entities.has(id))); }
+      if (g) {
+        this.ui.selected = new Set(g.filter(id => this.getSim().entities.has(id)));
+        // doble toque: centra la cámara en el grupo
+        const now = performance.now();
+        if (this.lastGroup.n === n && now - this.lastGroup.t < 350) this.centerOnSelection();
+        this.lastGroup = { n, t: now };
+      }
       return;
     }
+    if (k === ',') { this.selectArmy(); return; }
     if (k === ' ' || k === 'Home') {
       e.preventDefault();
       const core = coreOf(this.getSim(), this.side);
@@ -290,6 +305,25 @@ export class Input {
     const tap: Record<string, [number, number]> = { z: [-0.12, 0], x: [0.12, 0], c: [0, 0.08], v: [0, -0.08] };
     if (tap[k] && !e.repeat) { this.space.rig.rotate(tap[k][0], tap[k][1]); return; }
     if (k.length === 1 && this.onHotkey(k.toUpperCase())) e.preventDefault();
+  }
+
+  private lastGroup = { n: -1, t: 0 };
+
+  private centerOnSelection() {
+    const us = this.selectedUnits();
+    if (!us.length) return;
+    const x = us.reduce((a, u) => a + u.pos.x, 0) / us.length, z = us.reduce((a, u) => a + u.pos.z, 0) / us.length;
+    this.space.rig.lookAt(x, z);
+  }
+
+  // todo el ejército del mapa (sin drones); un segundo toque centra la cámara
+  private selectArmy() {
+    const s = this.getSim();
+    const army = [...s.entities.values()].filter((e): e is Unit => e.kind === 'unit' && e.side === this.side && e.type !== 'drone');
+    if (!army.length) return;
+    const same = army.length === this.ui.selected.size && army.every(u => this.ui.selected.has(u.id));
+    this.ui.selected = new Set(army.map(u => u.id));
+    if (same) this.centerOnSelection();
   }
 
   private selectIdleDrone() {
