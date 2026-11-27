@@ -538,3 +538,113 @@ button.lb-mode { cursor: pointer; }
 .u-route em { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--stellar); }
 .u-hud .toasts { top: 146px; }
 @media (max-width: 900px) { .u-search { top: 58px; } }
+
+/* =====================================================================
+   Liquid glass: cristal translúcido estilo iOS para el menú y el Universo.
+   Capas: tinte oscuro + reflejo diagonal, desenfoque con saturación, filo
+   especular (más brillante arriba a la izquierda) y sombra interior.
+   ===================================================================== */
+:root {
+  --glass-tint: rgba(18, 21, 36, 0.42);
+  --glass-sheen: linear-gradient(135deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.04) 38%, rgba(255,255,255,0.015) 62%, rgba(255,255,255,0.07) 100%);
+  --glass-blur: blur(26px) saturate(185%) brightness(1.05);
+  --glass-edge: linear-gradient(140deg, rgba(255,255,255,0.55), rgba(255,255,255,0.10) 32%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.30));
+  --glass-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 1px rgba(255,255,255,0.05), inset 0 0 24px rgba(255,255,255,0.03), 0 18px 48px rgba(0,0,0,0.38);
+  --glass-r: 22px;
+}
+.glass, .u-top, .u-panel, .u-search label, .u-results, .u-route, .u-legend, .u-card, .lb-mode, .lb-stats {
+  background: var(--glass-sheen), var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: var(--glass-shadow);
+}
+/* filo especular: borde con degradado recortado con máscara */
+.u-top::before, .u-search label::before, .u-results::before, .u-route::before, .u-legend::before, .lb-mode::before, .lb-stats::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 2;
+  background: var(--glass-edge);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+}
+
+/* ---- barra superior del Universo: cápsula flotante ---- */
+.u-top { top: 10px; left: 12px; right: 12px; height: 50px; border-radius: 20px; padding: 0 10px 0 16px; border-image: none; }
+.u-top .u-chip, .u-top .u-progress, .u-top .u-mode { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12); }
+.u-top .u-btn { border-radius: 12px; background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); box-shadow: inset 0 1px 0 rgba(255,255,255,0.16); }
+.u-top .u-btn:hover { background: rgba(255,255,255,0.13); border-color: rgba(255,255,255,0.28); box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 18px rgba(0,0,0,0.25); }
+.u-top .u-btn#u-quick { background: linear-gradient(180deg, rgba(255,236,120,0.95), rgba(240,196,20,0.95)); color: #141006; border-color: rgba(255,255,255,0.45); font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 6px 20px rgba(253,218,36,0.25); }
+.u-galaxy { top: 74px; }
+
+/* ---- buscador y rumbo ---- */
+.u-search { top: 72px; }
+.u-search label { position: relative; height: 42px; border-radius: 999px; padding: 0 12px 0 16px; }
+.u-search label:focus-within { border-color: rgba(255,255,255,0.22); box-shadow: var(--glass-shadow), 0 0 0 4px rgba(253,218,36,0.12); }
+.u-results { position: relative; margin-top: 8px; border-radius: 20px; padding: 6px; }
+.u-results button { border-radius: 14px; border-bottom: none; padding: 9px 12px; }
+.u-results button.on, .u-results button:hover { background: rgba(255,255,255,0.09); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1); }
+.u-route { top: 122px; border-radius: 999px; padding: 7px 14px; }
+.u-hud .toasts { top: 164px; }
+.u-legend { border-radius: 999px; }
+
+/* ---- fichas de Explorar ---- */
+.u-panel { top: 74px; border-radius: var(--glass-r); padding: 0 18px 16px; max-height: calc(100vh - 150px); }
+.u-ph { border-bottom-color: rgba(255,255,255,0.08); }
+.u-ph::before { left: 18px; right: 18px; width: auto; top: 0; border-radius: 0 0 2px 2px; }
+.u-ph h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
+.u-crumb i { border-radius: 50%; }
+.u-chips span { border-radius: 999px; background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.1); padding: 3px 10px; }
+.u-spec { border: none; background: rgba(255,255,255,0.04); border-radius: 16px; padding: 2px 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.06); }
+.u-spec div:last-child { border-bottom: none; }
+.u-spec div { border-bottom-color: rgba(255,255,255,0.06); }
+.u-metrics { gap: 6px; background: none; border: none; }
+.u-metrics div { background: rgba(255,255,255,0.05); border-radius: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+.u-srcl { border-radius: 14px; background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06); }
+a.u-srcl:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); }
+.u-alert { border-radius: 14px; }
+.u-quiz { border-radius: 18px; background: rgba(253,218,36,0.05); border-color: rgba(253,218,36,0.22); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06); }
+.u-opt { border-radius: 12px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.09); }
+.u-opt:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.22); }
+.u-similar .u-opt { border-radius: 12px; }
+.u-tabs { background: rgba(255,255,255,0.05); border-radius: 999px; padding: 3px; gap: 2px; width: fit-content; }
+.u-tabs button { border: none; border-radius: 999px; background: none; padding: 6px 14px; }
+.u-tabs button.on { background: rgba(255,255,255,0.14); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 8px rgba(0,0,0,0.25); }
+.u-form select, .u-form input, .u-quote, .u-row input { border-radius: 12px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
+.u-row button, .u-order button, .u-slot button { border-radius: 10px; background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); }
+.u-cta { border-radius: 14px; background: linear-gradient(180deg, #ffe874, #f2c613); border-color: rgba(255,255,255,0.5); color: #141006;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), inset 0 -2px 6px rgba(150,110,0,0.25), 0 8px 22px rgba(253,218,36,0.22); }
+.u-cta:hover { background: linear-gradient(180deg, #fff09a, #f6cf2c); }
+.u-cta.big kbd { border-color: rgba(0,0,0,0.25); border-radius: 6px; }
+.u-card { border-radius: 28px; }
+/* paneles con scroll: el filo va en el propio borde (un pseudo-elemento se desplazaría con el contenido) */
+.u-panel, .u-card { border-color: rgba(255,255,255,0.1); border-top-color: rgba(255,255,255,0.3); border-left-color: rgba(255,255,255,0.18); }
+.u-modal { background: rgba(3,4,10,0.35); }
+
+/* ---- menú de entrada ---- */
+.lobby.lb2 { background:
+  linear-gradient(90deg, rgba(3,4,9,0.78) 0%, rgba(3,4,9,0.55) 26%, rgba(3,4,9,0.2) 46%, rgba(3,4,9,0) 60%),
+  linear-gradient(0deg, rgba(3,4,9,0.6) 0%, rgba(3,4,9,0) 22%); }
+.lb-stats { position: relative; gap: 0; border-radius: 22px; overflow: hidden; }
+.lb-stats div { background: none; border-left: 1px solid rgba(255,255,255,0.07); }
+.lb-stats div:first-child { border-left: none; }
+.lb-mode { border-radius: 28px; padding: 18px 18px 18px 16px; }
+.lb-mode:hover { border-color: rgba(255,255,255,0.18); box-shadow: var(--glass-shadow), 0 24px 60px rgba(0,0,0,0.35); }
+.lb-mode.primary { background: linear-gradient(135deg, rgba(253,218,36,0.12), rgba(255,255,255,0.03) 45%, rgba(253,218,36,0.05)), var(--glass-tint); border-color: rgba(253,218,36,0.25);
+  box-shadow: var(--glass-shadow), 0 20px 60px rgba(253,218,36,0.07); }
+.lb-mode.primary:hover { border-color: rgba(253,218,36,0.45); box-shadow: var(--glass-shadow), 0 24px 70px rgba(253,218,36,0.14); }
+.lb-mode::after { border-radius: inherit; }
+.lb-art { border-radius: 20px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 20px rgba(0,0,0,0.35); }
+.lb-cta { border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -2px 6px rgba(150,110,0,0.25), 0 8px 22px rgba(253,218,36,0.25); }
+.lb-mode:not(.primary) .lb-cta { background: rgba(46,230,255,0.1); border: 1px solid rgba(46,230,255,0.35); box-shadow: inset 0 1px 0 rgba(255,255,255,0.18); }
+.lb-diff .opts { border-radius: 999px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); padding: 2px; }
+.lb-diff .opts button { border-left: none; border-radius: 999px; }
+.lb-diff .opts button.on { background: rgba(255,255,255,0.14); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 8px rgba(0,0,0,0.25); }
+.lb-net { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: inset 0 1px 0 rgba(255,255,255,0.15); }
+
+@media (max-width: 900px) {
+  .u-top { left: 8px; right: 8px; top: 8px; }
+  .u-search { top: 66px; }
+  .u-panel { top: auto; bottom: 12px; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .u-top, .u-panel, .u-search label, .u-results, .u-route, .u-legend, .u-card, .lb-mode, .lb-stats { background: rgba(14,16,28,0.96); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
