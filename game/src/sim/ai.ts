@@ -55,9 +55,9 @@ const DRONES_BY_ERA = [0, 12, 18, 24, 28];
 
 // orden de construcción: [módulo, cuántos debe haber]
 const PLAN: [ModuleType, number][] = [
-  ['habitat', 1], ['solar', 1], ['hangar', 1], ['factory', 1], ['lab', 1], ['habitat', 2], ['solar', 2],
-  ['anchor', 1], ['turret', 1], ['habitat', 3], ['hangar', 2], ['solar', 3], ['turret', 2], ['factory', 2],
-  ['habitat', 4], ['solar', 4], ['habitat', 5], ['beacon', 1],
+  ['habitat', 1], ['solar', 1], ['hangar', 1], ['factory', 1], ['lab', 1], ['habitat', 2], ['seti', 1], ['solar', 2],
+  ['anchor', 1], ['turret', 1], ['shield', 1], ['habitat', 3], ['replicator', 1], ['hangar', 2], ['solar', 3], ['turret', 2],
+  ['dyson', 1], ['factory', 2], ['habitat', 4], ['solar', 4], ['matrioshka', 1], ['habitat', 5], ['beacon', 1],
 ];
 
 export function aiThink(s: SimState, mem: AiMemory): Command[] {
@@ -95,6 +95,7 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
   // 1) drones: no más de los que tiene el jugador (con algo de holgura)
   const foeDrones = foeUnits.filter(u => u.type === 'drone').length;
   const wantDrones = Math.min(DRONES_BY_ERA[pl.era], Math.round(foeDrones * level) + 5);
+  pl.maxDrones = wantDrones;
   if (drones.length < wantDrones && core.queue.length < 2 && used < cap && canAfford(pl.res, UNITS.drone.cost)) {
     out.push({ kind: 'train', module: core.id, unit: 'drone' });
   }
@@ -135,28 +136,31 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
     else Object.assign(reserve, up.cost);
   }
 
-  // 4) recolección: drones ociosos al recurso que más falta
-  const idle = drones.filter(d => d.order.kind === 'idle');
-  if (idle.length) {
-    const gathering = drones.filter(d => d.order.kind === 'gather');
-    const onLumen = gathering.filter(d => {
-      const t = d.order.kind === 'gather' ? s.entities.get(d.order.target) : undefined;
-      return t?.kind === 'asteroid' && t.res === 'lumen';
-    }).length;
-    // un par de drones a los cristales cuando la energía escasea
-    let onEnergy = gathering.filter(d => {
-      const t = d.order.kind === 'gather' ? s.entities.get(d.order.target) : undefined;
-      return t?.kind === 'asteroid' && t.res === 'energy';
-    }).length;
-    for (const d of idle) {
-      if (pl.res.energy < 150 && onEnergy < 2) {
-        const e = bestAsteroid(s, side, 'energy');
-        if (e) { out.push({ kind: 'gather', units: [d.id], target: e }); onEnergy++; continue; }
-      }
-      const res = onLumen <= gathering.length - onLumen ? 'lumen' : 'metal';
-      const a = bestAsteroid(s, side, res) ?? bestAsteroid(s, side, res === 'lumen' ? 'metal' : 'lumen');
-      if (a) out.push({ kind: 'gather', units: [d.id], target: a });
+  // 4) recolección: drones ociosos al recurso del que hay menos; si uno se acumula de más, mueve un dron al otro
+  const target = (d: Unit) => d.order.kind === 'gather' ? s.entities.get(d.order.target) : undefined;
+  const on = (res: AsteroidKind) => drones.filter(d => { const t = target(d); return t?.kind === 'asteroid' && t.res === res; });
+  let onEnergy = on('energy').length;
+  const pick = (): AsteroidKind => (pl.res.metal - reserve.metal < pl.res.lumens - reserve.lumens ? 'metal' : 'lumen');
+  for (const d of drones.filter(x => x.order.kind === 'idle')) {
+    if (pl.res.energy < 150 && onEnergy < 2) {
+      const e = bestAsteroid(s, side, 'energy');
+      if (e) { out.push({ kind: 'gather', units: [d.id], target: e }); onEnergy++; continue; }
     }
+    const res = pick();
+    const a = bestAsteroid(s, side, res) ?? bestAsteroid(s, side, res === 'lumen' ? 'metal' : 'lumen');
+    if (a) out.push({ kind: 'gather', units: [d.id], target: a });
+  }
+  const glut = pl.res.lumens - pl.res.metal;
+  if (Math.abs(glut) > 500 && Math.floor(s.tick / 10) % 10 === 0) {
+    const from: AsteroidKind = glut > 0 ? 'lumen' : 'metal';
+    const mover = on(from).find(d => !d.carry);
+    const a = mover && bestAsteroid(s, side, from === 'lumen' ? 'metal' : 'lumen');
+    if (mover && a) out.push({ kind: 'gather', units: [mover.id], target: a });
+  }
+  if (pl.res.energy > 600 && onEnergy > 0 && Math.floor(s.tick / 10) % 10 === 5) {
+    const mover = on('energy').find(d => !d.carry);
+    const a = mover && bestAsteroid(s, side, pick());
+    if (mover && a) out.push({ kind: 'gather', units: [mover.id], target: a });
   }
 
   // 5) ejército

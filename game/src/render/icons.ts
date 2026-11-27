@@ -4,6 +4,7 @@ import type { ModuleType, UnitType } from '../sim/types';
 
 export const MODULE_GLYPH: Record<ModuleType, string> = {
   core: '✦', habitat: '⌂', solar: '☀', anchor: '⚓', hangar: '✈', factory: '⚙', lab: '⚗', turret: '⌖', beacon: '✺',
+  seti: '≋', replicator: '⟁', shield: '⛨', dyson: '☼', matrioshka: '◎',
 };
 export const UNIT_GLYPH: Record<UnitType, string> = {
   drone: '◇', interceptor: '➤', mecha: '♜', frigate: '⛴', titan: '♛', dreadnought: '✠',

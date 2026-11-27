@@ -300,6 +300,144 @@ export function buildModule(type: ModuleType, side: Owner): ModuleModel {
       }
       break;
     }
+    case 'seti': {
+      // radiotelescopio: plato parabólico inclinado sobre una montura que barre el cielo, con ondas que suben
+      g.add(hexBase(m, 7));
+      g.add(at(cyl(1.6, 2.2, 3, m.plating, 10), 0, 2.6, 0));
+      const mount = at(new THREE.Group(), 0, 5.5, 0);
+      const dish = new THREE.Mesh(new THREE.SphereGeometry(5.2, 28, 10, 0, Math.PI * 2, 0, Math.PI / 3.2), m.hull);
+      dish.material = m.hull;
+      dish.rotation.x = Math.PI;
+      dish.scale.y = 0.55;
+      const tilt = new THREE.Group();
+      tilt.rotation.x = -0.7;
+      tilt.add(at(dish, 0, 2.6, 0));
+      tilt.add(at(flat(torus(4.6, 0.18, m.trim, 40)), 0, 0.5, 0));
+      for (let i = 0; i < 3; i++) {
+        const strut = at(cyl(0.08, 0.08, 4.4, m.hull, 4), Math.cos(i * 2.1) * 1.6, 2.4, Math.sin(i * 2.1) * 1.6);
+        strut.lookAt(0, 4.4, 0);
+        tilt.add(strut);
+      }
+      tilt.add(at(sphere(0.5, m.glow, 10, 8), 0, 4.6, 0));
+      mount.add(tilt);
+      g.add(mount);
+      spins.push({ obj: mount, axis: 'y', speed: 0.25 });
+      // ondas de señal: anillos que suben y se apagan
+      const waves: THREE.Mesh[] = [];
+      for (let i = 0; i < 3; i++) {
+        const w = flat(torus(2, 0.1, m.portal, 32));
+        g.add(w);
+        waves.push(w);
+      }
+      tick = t => waves.forEach((w, i) => {
+        const k = (t * 0.4 + i / 3) % 1;
+        w.position.y = 11 + k * 10;
+        w.scale.setScalar(0.6 + k * 2);
+        w.visible = k < 0.92;
+      });
+      break;
+    }
+    case 'replicator': {
+      // replicador Von Neumann: pirámide de ensamblaje con brazos que giran y un dron a medio fabricar arriba
+      g.add(hexBase(m, 7));
+      const pyr = new THREE.Mesh(new THREE.ConeGeometry(5, 7, 4), m.plating);
+      pyr.rotation.y = Math.PI / 4;
+      g.add(at(pyr, 0, 4.8, 0));
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        const edge = at(box(0.25, 7.6, 0.25, m.trim), Math.cos(a) * 2.4, 4.6, Math.sin(a) * 2.4);
+        edge.lookAt(0, 8.3, 0);
+        edge.rotateX(Math.PI / 2);
+        g.add(edge);
+      }
+      const arms = at(new THREE.Group(), 0, 7.2, 0);
+      for (let i = 0; i < 3; i++) {
+        const arm = new THREE.Group();
+        arm.rotation.y = (i / 3) * Math.PI * 2;
+        arm.add(at(box(4.2, 0.35, 0.35, m.hull), 2.4, 0.8, 0));
+        arm.add(at(sphere(0.35, m.glow, 8, 6), 4.4, 0.8, 0));
+        arms.add(arm);
+      }
+      g.add(arms);
+      spins.push({ obj: arms, axis: 'y', speed: 1.2 });
+      // la copia en construcción: un dron fantasma que late
+      const copy = at(new THREE.Group(), 0, 10.2, 0);
+      copy.add(sphere(1.1, m.portal, 14, 10));
+      const band = flat(torus(1.2, 0.15, m.glow, 24));
+      copy.add(band);
+      g.add(copy);
+      tick = t => { const k = 0.7 + 0.3 * Math.sin(t * 2.5); copy.scale.setScalar(k); copy.rotation.y = t; };
+      break;
+    }
+    case 'shield': {
+      // proyector de escudo: pilón con tres emisores y una cúpula de fuerza translúcida que respira
+      g.add(hexBase(m, 7));
+      g.add(at(cyl(1.2, 2.4, 9, m.plating, 6), 0, 5.5, 0));
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        const fin = at(box(0.4, 7, 2.2, m.trim), Math.cos(a) * 2.2, 5, Math.sin(a) * 2.2);
+        fin.rotation.y = -a;
+        g.add(fin);
+      }
+      g.add(at(sphere(1.4, m.glow, 14, 10), 0, 10.6, 0));
+      const domeMat = new THREE.MeshBasicMaterial({ color: SIDE_COLORS[side].clone().multiplyScalar(0.9), transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, wireframe: false });
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(16, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), domeMat);
+      dome.scale.y = 0.6;
+      g.add(at(dome, 0, 1, 0));
+      const grid = new THREE.Mesh(new THREE.IcosahedronGeometry(16, 1), new THREE.MeshBasicMaterial({ color: SIDE_COLORS[side].clone().multiplyScalar(1.2), wireframe: true, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
+      grid.scale.y = 0.6;
+      g.add(at(grid, 0, 1, 0));
+      spins.push({ obj: grid, axis: 'y', speed: 0.15 });
+      tick = t => { domeMat.opacity = 0.06 + 0.04 * Math.sin(t * 1.5); };
+      break;
+    }
+    case 'dyson': {
+      // enjambre Dyson: una estrella artificial rodeada de colectores en tres órbitas inclinadas
+      g.add(hexBase(m, 8));
+      g.add(at(cyl(1.4, 3, 4, m.plating, 8), 0, 3, 0));
+      const starMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 1.7, 0.6) });
+      const star = at(sphere(2.6, starMat, 24, 16), 0, 10, 0);
+      g.add(star);
+      const corona = new THREE.Mesh(new THREE.SphereGeometry(3.6, 20, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 0.8, 0.2), transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false }));
+      g.add(at(corona, 0, 10, 0));
+      for (let o = 0; o < 3; o++) {
+        const orbit = at(new THREE.Group(), 0, 10, 0);
+        const tilt = new THREE.Group();
+        tilt.rotation.set(0.5 + o * 0.55, o * 1.1, 0);
+        const r = 5 + o * 1.3;
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2;
+          const panel = at(box(1.2, 0.08, 0.9, m.panel), Math.cos(a) * r, 0, Math.sin(a) * r);
+          panel.lookAt(0, 0, 0);
+          tilt.add(panel);
+        }
+        tilt.add(flat(torus(r, 0.04, m.glow, 64)));
+        orbit.add(tilt);
+        g.add(orbit);
+        spins.push({ obj: tilt, axis: 'y', speed: (o % 2 ? -1 : 1) * (0.5 + o * 0.2) });
+      }
+      tick = t => { const k = 1 + Math.sin(t * 3) * 0.06; corona.scale.setScalar(k); };
+      break;
+    }
+    case 'matrioshka': {
+      // cerebro Matrioshka: capas esféricas de computación anidadas, cada una girando en otro eje
+      g.add(hexBase(m, 8));
+      g.add(at(cyl(2, 3.4, 3, m.plating, 8), 0, 2.4, 0));
+      const center = at(new THREE.Group(), 0, 11, 0);
+      center.add(sphere(1.8, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2, 1.2) }), 20, 14));
+      const shells: THREE.Object3D[] = [];
+      [[3.2, 1], [4.6, 0], [6, 1]].forEach(([r, wire], i) => {
+        const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), wire
+          ? new THREE.MeshBasicMaterial({ color: SIDE_COLORS[side].clone().multiplyScalar(1.3), wireframe: true, transparent: true, opacity: 0.5 })
+          : new THREE.MeshStandardMaterial({ color: 0x9aa6c4, metalness: 0.6, roughness: 0.3, transparent: true, opacity: 0.35, flatShading: true }));
+        shell.rotation.set(i * 0.6, i, 0);
+        center.add(shell);
+        shells.push(shell);
+      });
+      g.add(center);
+      tick = t => shells.forEach((sh, i) => { sh.rotation.y = t * (0.3 + i * 0.15) * (i % 2 ? -1 : 1); sh.rotation.x = t * 0.1 * (i + 1); });
+      break;
+    }
   }
   return { group: g, spins, tick };
 }

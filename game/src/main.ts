@@ -223,7 +223,7 @@ function showcase(sim: SimState) {
   pl.era = 4;
   pl.res = { lumens: 1e5, metal: 1e5, energy: 1e5 };
   const drone = units(sim, LOCAL)[0].id;
-  for (const t of ['habitat', 'solar', 'hangar', 'factory', 'lab', 'turret', 'beacon', 'habitat', 'solar'] as const) {
+  for (const t of ['habitat', 'solar', 'hangar', 'factory', 'lab', 'turret', 'beacon', 'habitat', 'solar', 'seti', 'replicator', 'shield', 'dyson', 'matrioshka'] as const) {
     const hex = freePorts(sim, LOCAL, t)[0];
     if (hex) applyCommand(sim, LOCAL, { kind: 'build', units: [drone], module: t, hex });
   }

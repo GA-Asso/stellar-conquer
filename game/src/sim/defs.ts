@@ -87,6 +87,15 @@ export interface ModuleDef {
   sight: number;
   radius: number;
   hotkey: string;
+  // recursos que llegan al cerrar cada ledger
+  perLedger?: Res;
+  // aliados en este radio reciben menos daño (fracción que se resta)
+  shield?: { radius: number; reduction: number };
+  // fabrica un dron gratis cada tantos segundos
+  replicate?: number;
+  // bonos globales mientras esté en pie
+  gatherBonus?: number;
+  trainSpeed?: number;
 }
 
 export const MODULES: Record<ModuleType, ModuleDef> = {
@@ -129,6 +138,32 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
     name: 'Faro de Consenso', desc: 'Maravilla: si resiste 30 ledgers, ganas la partida.', cost: cost(1200, 1000, 400),
     hp: 4200, buildTime: 90, era: 4, pop: 0, energy: 0, trains: [], dropsite: false, freePlacement: false,
     sight: 60, radius: 9, hotkey: 'K',
+  },
+  // tecnología de civilizaciones avanzadas: ideas reales de la búsqueda de tecnofirmas, con nombre de juego
+  seti: {
+    name: 'Antena SETI', desc: 'Escucha el cosmos: cada ledger capta una señal que trae Lumens y energía.', cost: cost(60, 80),
+    hp: 450, buildTime: 18, era: 1, pop: 0, energy: 0, trains: [], dropsite: false, freePlacement: false, sight: 90, radius: 7,
+    hotkey: 'L', perLedger: cost(10, 0, 6),
+  },
+  replicator: {
+    name: 'Replicador Von Neumann', desc: 'Máquina que se copia a sí misma: fabrica un dron gratis cada 30 s.', cost: cost(150, 150, 40),
+    hp: 700, buildTime: 30, era: 2, pop: 0, energy: 0, trains: [], dropsite: false, freePlacement: false, sight: 35, radius: 7,
+    hotkey: 'B', replicate: 30,
+  },
+  shield: {
+    name: 'Proyector de Escudo', desc: 'Cúpula de fuerza: tus módulos y unidades cercanas reciben 35 % menos daño.', cost: cost(60, 120, 60),
+    hp: 600, buildTime: 22, era: 2, pop: 0, energy: 0, trains: [], dropsite: false, freePlacement: false, sight: 40, radius: 7,
+    hotkey: 'N', shield: { radius: 42, reduction: 0.35 },
+  },
+  dyson: {
+    name: 'Enjambre Dyson', desc: 'Miles de colectores en órbita de una estrella artificial: energía a raudales.', cost: cost(200, 260),
+    hp: 950, buildTime: 40, era: 3, pop: 0, energy: 3, trains: [], dropsite: false, freePlacement: false, sight: 40, radius: 8,
+    hotkey: 'M',
+  },
+  matrioshka: {
+    name: 'Cerebro Matrioshka', desc: 'Capas de computación alrededor de un sol: +30 % de minería y fabricación 30 % más rápida.',
+    cost: cost(400, 400, 200), hp: 1500, buildTime: 50, era: 4, pop: 0, energy: 0.5, trains: [], dropsite: false, freePlacement: false,
+    sight: 50, radius: 8, hotkey: 'O', gatherBonus: 0.3, trainSpeed: 0.3,
   },
 };
 

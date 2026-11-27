@@ -20,6 +20,11 @@ const MODULE_HELP: Record<ModuleType, string> = {
   lab: 'Laboratorio Soroban: necesario para avanzar de era desde el Núcleo. Además, tus drones minan un 20 % más rápido.',
   turret: 'Defensa automática que dispara a las unidades enemigas cercanas. Ponla en el lado que mira al rival.',
   beacon: 'La maravilla. Si resiste 30 ledgers (~2,5 min) ganas la partida. El rival intentará destruirlo.',
+  seti: 'Inspirada en la búsqueda de señales extraterrestres: cada ledger capta una señal que suma 10 Lumens y 6 de energía. Barata y útil desde el principio.',
+  replicator: 'Una sonda de Von Neumann: máquina que se fabrica a sí misma. Cada 30 s sale un dron gratis que se pone a minar (si tienes población libre).',
+  shield: 'Proyecta una cúpula de fuerza: todo lo tuyo en un radio de 42 recibe 35 % menos daño. Ponlo en el centro de la estación.',
+  dyson: 'Enjambre de colectores alrededor de una estrella artificial, la megaestructura más famosa de las tecnofirmas. Genera +3 de energía por segundo.',
+  matrioshka: 'Capas de computadoras que rodean un sol y aprovechan su calor. +30 % de minería y todas tus fábricas producen 30 % más rápido.',
 };
 const UNIT_HELP: Record<UnitType, string> = {
   drone: 'Trabajador: mina asteroides (clic derecho sobre uno) y ensambla o repara módulos. No combate bien.',
@@ -39,7 +44,7 @@ const costText = (c: Res) => [
   c.energy ? `<span class="c-e">${c.energy}</span>` : '',
 ].join(' ');
 
-const BUILD_ORDER: ModuleType[] = ['habitat', 'solar', 'anchor', 'hangar', 'factory', 'lab', 'turret', 'beacon'];
+const BUILD_ORDER: ModuleType[] = ['habitat', 'solar', 'anchor', 'hangar', 'factory', 'lab', 'seti', 'turret', 'replicator', 'shield', 'dyson', 'matrioshka', 'beacon'];
 
 export class Hud {
   private root: HTMLDivElement;

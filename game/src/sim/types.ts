@@ -6,7 +6,8 @@ export type ResKey = 'lumens' | 'metal' | 'energy';
 export type Res = Record<ResKey, number>;
 
 export type UnitType = 'drone' | 'interceptor' | 'mecha' | 'frigate' | 'titan' | 'dreadnought';
-export type ModuleType = 'core' | 'habitat' | 'solar' | 'anchor' | 'hangar' | 'factory' | 'lab' | 'turret' | 'beacon';
+export type ModuleType = 'core' | 'habitat' | 'solar' | 'anchor' | 'hangar' | 'factory' | 'lab' | 'turret' | 'beacon'
+  | 'seti' | 'replicator' | 'shield' | 'dyson' | 'matrioshka';
 export type AsteroidKind = 'lumen' | 'metal' | 'energy';
 export type Era = 1 | 2 | 3 | 4;
 
@@ -94,6 +95,8 @@ export interface Player {
   gatherMult: number;
   // alto el fuego: sus unidades y torretas no disparan primero (la IA pacífica lo usa hasta que la atacan)
   holdFire: boolean;
+  // tope de drones que fabrica el Replicador Von Neumann
+  maxDrones: number;
 }
 
 export type SimEvent =

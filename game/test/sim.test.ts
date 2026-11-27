@@ -98,3 +98,34 @@ describe('planetas y ledgers', () => {
     expect(s.ledger).toBeGreaterThan(0);
   });
 });
+
+describe('tecnología avanzada', () => {
+  it('la antena SETI paga cada ledger, el escudo reduce daño y el replicador fabrica drones', async () => {
+    const { MODULES } = await import('../src/sim/defs');
+    const { applyCommand, coreOf: core, freePorts, modules: mods, step: st, units: us, createSim: mk } = await import('../src/sim/sim');
+    const s = mk(21);
+    const pl = s.players[0];
+    pl.era = 4;
+    pl.res = { lumens: 1e5, metal: 1e5, energy: 1e5 };
+    const drone = us(s, 0)[0].id;
+    for (const t of ['habitat', 'seti', 'shield', 'replicator'] as const) {
+      applyCommand(s, 0, { kind: 'build', units: [drone], module: t, hex: freePorts(s, 0, t)[0] });
+    }
+    for (const m of mods(s, 0)) { m.built = 1; m.hp = m.maxHp; }
+    const before = { ...pl.res };
+    const drones0 = us(s, 0).filter(u => u.type === 'drone').length;
+    for (let t = 0; t < 100; t++) st(s);
+    expect(pl.res.lumens).toBeGreaterThanOrEqual(before.lumens + MODULES.seti.perLedger!.lumens);
+    expect(us(s, 0).filter(u => u.type === 'drone').length).toBeGreaterThan(drones0);
+    // un disparo al núcleo, cubierto por el escudo, hace 35 % menos daño
+    const c = core(s, 0)!;
+    const enemy = us(s, 1)[0];
+    enemy.type = 'interceptor';
+    enemy.pos = { x: c.pos.x + 20, z: c.pos.z };
+    enemy.order = { kind: 'attack', target: c.id };
+    enemy.cooldown = 0;
+    const hp = c.hp;
+    st(s);
+    expect(hp - c.hp).toBeCloseTo(7 * 0.5 * 0.65, 3);
+  });
+});

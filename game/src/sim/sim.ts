@@ -163,7 +163,7 @@ export function createSim(seed = 1): SimState {
 }
 
 function mkPlayer(side: Side): Player {
-  return { side, res: { ...START_RES }, era: 1, alive: true, beaconLedgers: 0, lastHit: -1, gatherMult: 1, holdFire: false };
+  return { side, res: { ...START_RES }, era: 1, alive: true, beaconLedgers: 0, lastHit: -1, gatherMult: 1, holdFire: false, maxDrones: 32 };
 }
 
 function addAsteroid(s: SimState, res: AsteroidKind, pos: Vec, rng: Rng) {
@@ -390,6 +390,10 @@ function closeLedger(s: SimState) {
   s.ledger++;
   s.events.push({ kind: 'ledger', seq: s.ledger });
   for (const p of planets(s)) if (p.owner !== -1) s.players[p.owner].res.lumens += PLANET.incomePerLedger;
+  for (const m of modules(s)) {
+    const inc = MODULES[m.type].perLedger;
+    if (inc && m.built >= 1) refund(s.players[m.side].res, inc);
+  }
   for (const pl of s.players) {
     const beacon = modules(s, pl.side).find(m => m.type === 'beacon' && m.built >= 1);
     pl.beaconLedgers = beacon ? pl.beaconLedgers + 1 : 0;
@@ -503,8 +507,26 @@ function nearestAsteroid(s: SimState, res: AsteroidKind | null, pos: Vec, maxD: 
   return best;
 }
 
+// la mayor protección de escudo que cubre una posición (los escudos no se suman)
+function shieldAt(s: SimState, side: Side, pos: Vec): number {
+  let best = 0;
+  for (const m of modules(s, side)) {
+    const sh = MODULES[m.type].shield;
+    if (!sh || m.built < 1 || dist(m.pos, pos) > sh.radius) continue;
+    best = Math.max(best, sh.reduction);
+  }
+  return best;
+}
+
+// bono global de un tipo de módulo en pie (el mayor, no se suman copias)
+function globalBonus(s: SimState, side: Side, key: 'gatherBonus' | 'trainSpeed'): number {
+  let b = 0;
+  for (const m of modules(s, side)) if (m.built >= 1) b = Math.max(b, MODULES[m.type][key] ?? 0);
+  return b;
+}
+
 function fire(s: SimState, from: Vec, side: Side, target: Unit | Module, damage: number, weapon: 'laser' | 'plasma' | 'melee') {
-  target.hp -= damage;
+  target.hp -= damage * (1 - shieldAt(s, target.side, target.pos));
   if (target.side !== side) s.players[target.side].lastHit = s.tick;
   s.events.push({ kind: 'shot', from: { ...from }, to: { ...target.pos }, side, weapon });
 }
@@ -628,7 +650,7 @@ function stepGather(s: SimState, u: Unit, o: Extract<Unit['order'], { kind: 'gat
   face(u, a.pos);
   if (u.carry && u.carry.res !== a.res) u.carry = null;
   if (!u.carry) u.carry = { res: a.res, amount: 0 };
-  const bonus = (hasBuilt(s, u.side, 'lab') ? 1 + GATHER.labBonus : 1) * pl.gatherMult;
+  const bonus = (hasBuilt(s, u.side, 'lab') ? 1 + GATHER.labBonus : 1) * (1 + globalBonus(s, u.side, 'gatherBonus')) * pl.gatherMult;
   const take = Math.min(a.amount, GATHER.rate * bonus * DT);
   a.amount -= take;
   u.carry.amount += take;
@@ -650,14 +672,28 @@ function stepModule(s: SimState, m: Module) {
     }
   }
 
+  // replicador: un dron nuevo cada tanto, si hay población y no sobran drones
+  if (md.replicate && m.cooldown <= 0) {
+    m.cooldown = md.replicate;
+    const drones = units(s, m.side).filter(u => u.type === 'drone').length;
+    if (drones < s.players[m.side].maxDrones && popUsed(s, m.side) + 1 <= popCap(s, m.side)) {
+      const a = (s.tick * 0.7) % (Math.PI * 2);
+      const u = addUnit(s, 'drone', m.side, { x: m.pos.x + Math.cos(a) * (md.radius + 4), z: m.pos.z + Math.sin(a) * (md.radius + 4) });
+      s.events.push({ kind: 'trained', id: u.id, side: m.side });
+      const field = nearestAsteroid(s, null, m.pos, 120);
+      if (field) { u.order = { kind: 'gather', target: field.id, phase: 'go' }; u.lastField = { ...field.pos }; }
+    }
+  }
+
   const q = m.queue[0];
   if (!q) return;
+  const inc = q.item === 'era' ? DT : DT * (1 + globalBonus(s, m.side, 'trainSpeed'));
   if (q.item !== 'era') {
     const ud = UNITS[q.item];
     // espera si no hay población; el progreso se congela al final
-    if (q.progress >= q.total - DT && popUsed(s, m.side) + ud.pop > popCap(s, m.side)) return;
+    if (q.progress + inc >= q.total && popUsed(s, m.side) + ud.pop > popCap(s, m.side)) return;
   }
-  q.progress += DT;
+  q.progress += inc;
   if (q.progress < q.total) return;
   m.queue.shift();
   if (q.item === 'era') {
