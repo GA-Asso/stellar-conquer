@@ -163,7 +163,7 @@ export function createSim(seed = 1): SimState {
 }
 
 function mkPlayer(side: Side): Player {
-  return { side, res: { ...START_RES }, era: 1, alive: true, beaconLedgers: 0 };
+  return { side, res: { ...START_RES }, era: 1, alive: true, beaconLedgers: 0, lastHit: -1, gatherMult: 1, holdFire: false };
 }
 
 function addAsteroid(s: SimState, res: AsteroidKind, pos: Vec, rng: Rng) {
@@ -505,6 +505,7 @@ function nearestAsteroid(s: SimState, res: AsteroidKind | null, pos: Vec, maxD: 
 
 function fire(s: SimState, from: Vec, side: Side, target: Unit | Module, damage: number, weapon: 'laser' | 'plasma' | 'melee') {
   target.hp -= damage;
+  if (target.side !== side) s.players[target.side].lastHit = s.tick;
   s.events.push({ kind: 'shot', from: { ...from }, to: { ...target.pos }, side, weapon });
 }
 
@@ -515,7 +516,7 @@ function stepUnit(s: SimState, u: Unit) {
 
   switch (o.kind) {
     case 'idle': {
-      if (d.cls !== 'worker') {
+      if (d.cls !== 'worker' && !s.players[u.side].holdFire) {
         const t = nearestEnemy(s, u.side, u.pos, d.sight);
         if (t) u.order = { kind: 'attack', target: t.id };
       }
@@ -627,7 +628,7 @@ function stepGather(s: SimState, u: Unit, o: Extract<Unit['order'], { kind: 'gat
   face(u, a.pos);
   if (u.carry && u.carry.res !== a.res) u.carry = null;
   if (!u.carry) u.carry = { res: a.res, amount: 0 };
-  const bonus = hasBuilt(s, u.side, 'lab') ? 1 + GATHER.labBonus : 1;
+  const bonus = (hasBuilt(s, u.side, 'lab') ? 1 + GATHER.labBonus : 1) * pl.gatherMult;
   const take = Math.min(a.amount, GATHER.rate * bonus * DT);
   a.amount -= take;
   u.carry.amount += take;
@@ -641,7 +642,7 @@ function stepModule(s: SimState, m: Module) {
   const pl = s.players[m.side];
   m.cooldown = Math.max(0, m.cooldown - DT);
 
-  if (md.attack && m.cooldown <= 0) {
+  if (md.attack && m.cooldown <= 0 && !pl.holdFire) {
     const t = nearestEnemy(s, m.side, m.pos, md.attack.range + md.radius, true);
     if (t) {
       fire(s, m.pos, m.side, t, md.attack.damage, md.attack.weapon);

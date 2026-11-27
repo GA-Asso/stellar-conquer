@@ -88,6 +88,12 @@ export interface Player {
   alive: boolean;
   // ledgers seguidos que el Faro de Consenso lleva en pie
   beaconLedgers: number;
+  // tick del último daño recibido de un rival (-1 si nunca): la IA pacífica despierta con esto
+  lastHit: number;
+  // multiplicador de recolección; la IA lo ajusta para nivelarse con el jugador
+  gatherMult: number;
+  // alto el fuego: sus unidades y torretas no disparan primero (la IA pacífica lo usa hasta que la atacan)
+  holdFire: boolean;
 }
 
 export type SimEvent =

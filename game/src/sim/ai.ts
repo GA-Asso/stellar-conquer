@@ -14,11 +14,41 @@ export interface AiMemory {
   wave: number;
   nextWaveTick: number;
   raiders: Set<number>;
+  // pacífica: no ataca, no disputa planetas ajenos ni levanta el Faro hasta que la atacan
+  passive: boolean;
+  provokedAt: number;
 }
 
-export function createAi(side: Side, difficulty: Difficulty = 'normal'): AiMemory {
+export interface AiOptions { passive?: boolean }
+
+export function createAi(side: Side, difficulty: Difficulty = 'normal', opts: AiOptions = {}): AiMemory {
   const first = { facil: 9 * 60, normal: 6 * 60, dificil: 4 * 60 }[difficulty] * 20;
-  return { side, difficulty, wave: 0, nextWaveTick: first, raiders: new Set() };
+  return { side, difficulty, wave: 0, nextWaveTick: first, raiders: new Set(), passive: opts.passive ?? true, provokedAt: -1 };
+}
+
+// nivelación: la IA apunta a tener esta fracción del poder del jugador
+const LEVEL = { facil: 0.75, normal: 1, dificil: 1.25 } as const;
+// margen de ejército que la IA siempre puede tener, para no quedar indefensa al principio
+const ARMY_FLOOR = { facil: 250, normal: 450, dificil: 700 } as const;
+// segundos entre que la atacan y su primera oleada de respuesta
+const RETALIATE = { facil: 120, normal: 75, dificil: 45 } as const;
+
+const costOf = (t: UnitType) => { const c = UNITS[t].cost; return c.lumens + c.metal + c.energy; };
+// poder militar: lo que costó el ejército (los drones no cuentan)
+export function armyValue(us: Unit[]): number {
+  let v = 0;
+  for (const u of us) if (u.type !== 'drone') v += costOf(u.type) * (u.hp / u.maxHp);
+  return v;
+}
+// poder económico: drones, módulos en pie y era
+function ecoValue(s: SimState, side: Side): number {
+  let v = units(s, side).filter(u => u.type === 'drone').length * 50;
+  for (const m of modules(s, side)) if (m.built >= 1 && m.type !== 'core') { const c = MODULES[m.type].cost; v += c.lumens + c.metal + c.energy; }
+  return v + s.players[side].era * 300;
+}
+
+export function isProvoked(s: SimState, mem: AiMemory): boolean {
+  return !mem.passive || s.players[mem.side].lastHit >= 0;
 }
 
 const DRONES_BY_ERA = [0, 12, 18, 24, 28];
@@ -43,9 +73,28 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
   const army = my.filter(u => u.type !== 'drone');
   const used = popUsed(s, side), cap = popCap(s, side);
   const reserve = { lumens: 0, metal: 0, energy: 0 };
+  const foe: Side = side === 0 ? 1 : 0;
+  const provoked = isProvoked(s, mem);
+  if (provoked && mem.provokedAt < 0) {
+    // la primera vez que la atacan: prepara la respuesta
+    mem.provokedAt = s.tick;
+    mem.nextWaveTick = Math.max(Math.min(mem.nextWaveTick, s.tick + RETALIATE[mem.difficulty] * 20), s.tick + 20 * 20);
+  }
 
-  // 1) drones
-  const wantDrones = DRONES_BY_ERA[pl.era];
+  pl.holdFire = !provoked;
+
+  // 0) nivelación con el jugador: la recolección de la IA sigue a la economía del rival
+  const level = LEVEL[mem.difficulty];
+  const foeUnits = units(s, foe);
+  const ecoTarget = (ecoValue(s, foe) * level + 200) / (ecoValue(s, side) + 200);
+  const mult = Math.max(0.55, Math.min(1.5, ecoTarget));
+  pl.gatherMult += (mult - pl.gatherMult) * 0.1;
+  const foeArmy = armyValue(foeUnits), myArmy = armyValue(army);
+  const armyCap = foeArmy * level * (provoked ? 1.3 : 1) + ARMY_FLOOR[mem.difficulty];
+
+  // 1) drones: no más de los que tiene el jugador (con algo de holgura)
+  const foeDrones = foeUnits.filter(u => u.type === 'drone').length;
+  const wantDrones = Math.min(DRONES_BY_ERA[pl.era], Math.round(foeDrones * level) + 5);
   if (drones.length < wantDrones && core.queue.length < 2 && used < cap && canAfford(pl.res, UNITS.drone.cost)) {
     out.push({ kind: 'train', module: core.id, unit: 'drone' });
   }
@@ -64,6 +113,7 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
     else {
       for (const [type, n] of PLAN) {
         if (pl.era < MODULES[type].era) continue;
+        if (type === 'beacon' && !provoked) continue;
         if (mods.filter(m => m.type === type).length < n) { want = type; break; }
       }
     }
@@ -112,6 +162,7 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
   // 5) ejército
   const spare = (k: 'lumens' | 'metal' | 'energy') => pl.res[k] - reserve[k];
   for (const m of mods) {
+    if (myArmy >= armyCap) break;
     if (m.built < 1 || m.queue.length >= 2 || m.type === 'core') continue;
     const options = MODULES[m.type].trains.filter(t => UNITS[t].era <= pl.era).reverse();
     for (const t of options) {
@@ -124,7 +175,8 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
   }
 
   // 6) defensa: si hay enemigos cerca de la estación, todo el ejército ocioso acude
-  const threat = units(s).find(u => u.side !== side && mods.some(m => dist(m.pos, u.pos) < 70));
+  // pacífica: tolera a quien se acerque mientras nadie le dispare
+  const threat = provoked ? foeUnits.find(u => mods.some(m => dist(m.pos, u.pos) < 70)) : undefined;
   if (threat) {
     const free = army.filter(u => !mem.raiders.has(u.id) && u.order.kind !== 'attack');
     if (free.length) out.push({ kind: 'attack', units: free.map(u => u.id), target: threat.id });
@@ -134,7 +186,7 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
   const robots = army.filter(u => UNITS[u.type].cls === 'robot' && u.order.kind === 'idle' && !mem.raiders.has(u.id));
   if (robots.length >= 2) {
     const target = planets(s)
-      .filter(p => p.owner !== side)
+      .filter(p => p.owner !== side && (provoked || p.owner === -1))
       .sort((a, b) => dist(a.pos, core.pos) - dist(b.pos, core.pos))[0];
     if (target) {
       const group = robots.slice(0, 3);
@@ -144,9 +196,10 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
 
   // 8) oleadas contra el núcleo enemigo
   for (const id of mem.raiders) if (!s.entities.has(id)) mem.raiders.delete(id);
-  const minWave = { facil: 6, normal: 8, dificil: 10 }[mem.difficulty] + mem.wave * 3;
+  // sale cuando su ejército libre iguala (según la dificultad) al del jugador
   const ships = army.filter(u => UNITS[u.type].cls === 'ship' && !mem.raiders.has(u.id));
-  if (s.tick >= mem.nextWaveTick && ships.length + robots.length >= minWave) {
+  const ready = ships.length + robots.length >= 4 && armyValue([...ships, ...robots]) >= foeArmy * level * 0.8;
+  if (provoked && s.tick >= mem.nextWaveTick && ready) {
     const enemyCore = coreOf(s, side === 0 ? 1 : 0);
     if (enemyCore) {
       const wave = [...ships, ...robots];

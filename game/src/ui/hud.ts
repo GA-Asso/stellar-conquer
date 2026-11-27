@@ -80,6 +80,7 @@ export class Hud {
         <div class="res" data-tip="Energía: la generan los paneles solares"><i class="ico e"></i><span id="r-e"></span></div>
         <div class="res" data-tip="Población"><i class="ico p"></i><span id="r-p"></span></div>
         <div class="era" id="era"></div>
+        <div class="stance" id="stance"></div>
         <div class="ledger"><span class="dot" id="ledger-dot"></span>Ledger <b id="ledger"></b><i id="ledger-bar"></i></div>
         <div class="clock" id="clock"></div>
       </div>
@@ -107,7 +108,7 @@ export class Hud {
       <div class="placing" id="placing"></div>
     `;
     host.appendChild(this.root);
-    for (const id of ['r-l', 'r-m', 'r-e', 'r-p', 'era', 'ledger', 'ledger-dot', 'ledger-bar', 'clock', 'sel', 'cmds', 'placing']) {
+    for (const id of ['r-l', 'r-m', 'r-e', 'r-p', 'era', 'ledger', 'ledger-dot', 'ledger-bar', 'stance', 'clock', 'sel', 'cmds', 'placing']) {
       this.el[id] = this.root.querySelector('#' + id)!;
     }
     this.toasts = this.root.querySelector('.toasts')!;
@@ -192,6 +193,15 @@ export class Hud {
     this.el['r-p'].textContent = `${used}/${cap}`;
     this.el['r-p'].parentElement!.classList.toggle('full', used >= cap);
     this.el.era.textContent = `Era ${ERAS[pl.era].name}`;
+    // postura del rival: en paz hasta que le disparas
+    const war = !s.players[this.side === 0 ? 1 : 0].holdFire;
+    if (this.el.stance.dataset.war !== String(war)) {
+      if (this.el.stance.dataset.war === 'false' && war) this.toast('Atacaste al rival: ahora responderá con oleadas', 'bad');
+      this.el.stance.dataset.war = String(war);
+      this.el.stance.className = 'stance' + (war ? ' war' : '');
+      this.el.stance.textContent = war ? '⚔ Rival en guerra' : '☮ Rival en paz';
+      this.el.stance.title = war ? 'El rival fue atacado y contraataca con oleadas.' : 'El rival no atacará hasta que le dispares. Crece a tu ritmo.';
+    }
     this.el.ledger.textContent = '#' + s.ledger.toLocaleString('es');
     const lp = (s.tick % LEDGER_TICKS) / LEDGER_TICKS;
     this.el['ledger-bar'].style.width = `${lp * 100}%`;
