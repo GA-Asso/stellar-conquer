@@ -505,3 +505,36 @@ button.lb-mode { cursor: pointer; }
 .u-top .u-btn kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .u-top #u-quick { background: var(--stellar); color: #111; border-color: var(--stellar); font-weight: 700; }
 .u-top #u-quick:hover { box-shadow: 0 0 20px rgba(253,218,36,0.4); }
+
+/* ---------- buscador del Universo ---------- */
+.u-search { position: absolute; top: 62px; left: 50%; transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); z-index: 5; }
+.u-search label { display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 10px 0 12px; background: rgba(10,12,22,0.9); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;
+  backdrop-filter: blur(12px); box-shadow: 0 10px 30px rgba(0,0,0,0.35); transition: border-color 0.15s; }
+.u-search label:focus-within { border-color: rgba(253,218,36,0.6); }
+.u-search-ic { width: 12px; height: 12px; border: 1.5px solid var(--muted); border-radius: 50%; position: relative; flex-shrink: 0; }
+.u-search-ic::after { content: ''; position: absolute; width: 5px; height: 1.5px; background: var(--muted); right: -4px; bottom: -2px; transform: rotate(45deg); }
+.u-search input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--ink); font-family: inherit; font-size: 13.5px; }
+.u-search input::placeholder { color: #6b7186; }
+.u-search input::-webkit-search-cancel-button { display: none; }
+.u-search kbd { font-family: var(--mono); font-size: 10px; color: var(--muted); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; padding: 0 5px; line-height: 16px; }
+.u-search label:focus-within kbd { display: none; }
+.u-results { display: none; margin-top: 4px; background: rgba(10,12,22,0.96); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; backdrop-filter: blur(12px); box-shadow: 0 18px 40px rgba(0,0,0,0.45); }
+.u-results.on { display: block; }
+.u-results button { width: 100%; display: grid; grid-template-columns: 8px 1fr auto; align-items: center; gap: 10px; padding: 8px 12px; background: none; border: none; border-bottom: 1px solid rgba(255,255,255,0.05);
+  color: var(--ink); text-align: left; font-family: inherit; cursor: pointer; }
+.u-results button:last-child { border-bottom: none; }
+.u-results button.on, .u-results button:hover { background: rgba(253,218,36,0.07); }
+.u-results i { width: 7px; height: 7px; border-radius: 50%; }
+.u-results span { min-width: 0; display: flex; flex-direction: column; }
+.u-results b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u-results small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u-results em { font-style: normal; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7186; }
+.u-results p { margin: 0; padding: 12px; font-size: 12.5px; color: var(--muted); }
+.u-route { position: absolute; top: 106px; left: 50%; transform: translateX(-50%) translateY(-4px); display: flex; align-items: center; gap: 9px; padding: 6px 12px; font-size: 12.5px;
+  background: rgba(10,12,22,0.88); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; white-space: nowrap; }
+.u-route.on { opacity: 1; transform: translateX(-50%); }
+.u-route i { width: 7px; height: 7px; border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
+.u-route span { color: var(--muted); } .u-route b { color: var(--ink); font-weight: 600; }
+.u-route em { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--stellar); }
+.u-hud .toasts { top: 146px; }
+@media (max-width: 900px) { .u-search { top: 58px; } }

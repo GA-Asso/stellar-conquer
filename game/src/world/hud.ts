@@ -8,6 +8,9 @@ import {
 import { DISCOVERABLE, galaxyOf, nodeSlug, type Galaxy, type WorldNode } from './ecosystem';
 import { STATUS_INFO, galaxyForProject, galaxyStats, projectUrl, usd, type RavenProject, type RavenSnapshot, type Star } from './atlas';
 import { observatoryHtml, wireObservatory } from './observatory';
+import { searchTargets, type SearchTarget } from './search';
+
+const KIND_ES: Record<SearchTarget['kind'], string> = { galaxy: 'Galaxia', node: 'Nodo', project: 'Proyecto', partner: 'Socio' };
 
 const TYPE_ES: Record<string, string> = {
   Wallet: 'Wallet', DEX: 'DEX', Lending: 'Préstamos', Bridge: 'Puente', Infrastructure: 'Infraestructura', Payments: 'Pagos',
@@ -58,6 +61,9 @@ export interface WorldHudEvents {
   onQuickMatch(): void;
   setFrozen(f: boolean): void;
   onFlyToStar(kind: Star['kind'], index: number): void;
+  /** índice del buscador (lo aporta el Universo, que conoce las posiciones) */
+  searchTargets(): SearchTarget[];
+  onNavigate(t: SearchTarget): void;
 }
 
 export class WorldHud {
@@ -83,6 +89,11 @@ export class WorldHud {
         <button class="u-btn" id="u-help">Ayuda <kbd>H</kbd></button>
         <button class="u-btn" id="u-quick">Partida rápida</button>
       </div>
+      <div class="u-search" id="u-search">
+        <label><i class="u-search-ic"></i><input id="u-q" type="search" placeholder="Buscar proyecto, galaxia o nodo" autocomplete="off" spellcheck="false" aria-label="Buscar en el universo"><kbd>/</kbd></label>
+        <div class="u-results" id="u-results" role="listbox"></div>
+      </div>
+      <div class="u-route" id="u-route"></div>
       <div class="u-galaxy" id="u-galaxy"></div>
       <div class="u-panel" id="u-panel"></div>
       <div class="u-log" id="u-log"></div>
@@ -101,9 +112,11 @@ export class WorldHud {
     } else this.$('#u-obs').style.display = 'none';
     this.$('#u-help').addEventListener('click', () => this.toggleHelp());
     this.$('#u-quick').addEventListener('click', () => this.ev.onQuickMatch());
+    this.wireSearch();
     this.keyHandler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT') return;
+      if (e.key === '/' || (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); (this.$('#u-q') as HTMLInputElement).focus(); return; }
       if (e.key === 'i' || e.key === 'I') this.toggleInventory();
       if (e.key === 'h' || e.key === 'H') this.toggleHelp();
       if (e.key === 'o' || e.key === 'O') this.toggleObservatory();
@@ -161,6 +174,58 @@ export class WorldHud {
     }
     el.innerHTML = `<b style="color:${g.color}">${esc(g.name)}</b><span>${esc(g.blurb)}</span>${stats}`;
     el.classList.add('on');
+  }
+
+  private searchIndex: SearchTarget[] | null = null;
+  private results: SearchTarget[] = [];
+  private active = 0;
+
+  private wireSearch() {
+    const input = this.$('#u-q') as HTMLInputElement;
+    const box = this.$('#u-results') as HTMLDivElement;
+    const render = () => {
+      this.searchIndex ??= this.ev.searchTargets();
+      this.results = searchTargets(this.searchIndex, input.value, 8);
+      this.active = Math.min(this.active, Math.max(0, this.results.length - 1));
+      if (!input.value.trim()) { box.innerHTML = ''; box.classList.remove('on'); return; }
+      box.innerHTML = this.results.length ? this.results.map((t, i) => `<button role="option" class="${i === this.active ? 'on' : ''}" data-r="${i}">
+          <i style="background:${t.color ?? 'var(--stellar)'}"></i><span><b>${esc(t.label)}</b><small>${esc(t.sub)}</small></span><em>${KIND_ES[t.kind]}</em></button>`).join('')
+        : `<p>Sin resultados para «${esc(input.value.trim())}».</p>`;
+      box.classList.add('on');
+    };
+    const go = (i: number) => {
+      const t = this.results[i];
+      if (!t) return;
+      this.ev.onNavigate(t);
+      input.value = '';
+      input.blur();
+      render();
+    };
+    input.addEventListener('input', () => { this.active = 0; render(); });
+    input.addEventListener('focus', render);
+    input.addEventListener('blur', () => setTimeout(() => box.classList.remove('on'), 150));
+    input.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.active = (this.active + (e.key === 'ArrowDown' ? 1 : -1) + this.results.length) % Math.max(1, this.results.length);
+        render();
+      } else if (e.key === 'Enter') { e.preventDefault(); go(this.active); }
+      else if (e.key === 'Escape') { input.value = ''; input.blur(); render(); }
+      e.stopPropagation();
+    });
+    // mousedown y no click: el blur del input cerraría la lista antes del click
+    box.addEventListener('mousedown', e => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-r]');
+      if (b) { e.preventDefault(); go(Number(b.dataset.r)); }
+    });
+  }
+
+  /** chip de rumbo: a dónde vamos y cuánto falta */
+  setRoute(r: { label: string; dist: number; eta: number; color: string } | null) {
+    const el = this.$('#u-route');
+    const html = r ? `<i style="background:${r.color}"></i><span>Rumbo a <b>${esc(r.label)}</b></span><em>${Math.round(r.dist).toLocaleString('es')} u · ${r.eta < 1 ? 'llegando' : Math.ceil(r.eta) + ' s'}</em>` : '';
+    if (el.innerHTML !== html) el.innerHTML = html;
+    el.classList.toggle('on', !!r);
   }
 
   setStar(s: Star | null) {

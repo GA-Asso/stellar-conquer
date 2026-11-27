@@ -139,6 +139,7 @@ async function enterUniverse() {
     onNode: n => hud?.setNode(n),
     onGalaxy: g => hud?.setGalaxy(g),
     onStar: st => hud?.setStar(st),
+    onRoute: r => hud?.setRoute(r),
   }, atlas);
   hud = new WorldHud(app, world, {
     onChange: () => { save(); universe.refresh(); },
@@ -146,6 +147,8 @@ async function enterUniverse() {
     onQuickMatch: () => launch(null),
     setFrozen: f => { universe.frozen = f; },
     onFlyToStar: (kind, index) => universe.flyToStar(kind, index),
+    searchTargets: () => universe.targets(),
+    onNavigate: t => universe.navigate(t),
   }, atlas);
   cosmos = { world, universe, hud, ledgerAcc: 0 };
   // solo en desarrollo: acceso desde la consola para probar (p. ej. __cosmos.universe.flyTo(...))

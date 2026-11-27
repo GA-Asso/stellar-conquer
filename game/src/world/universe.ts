@@ -9,6 +9,7 @@ import { STATUS_INFO, layoutAtlas, type RavenSnapshot, type Star } from './atlas
 /** color de los astros cuya web oficial no responde */
 const LOST = '#5d6275';
 import { Scenery, Trail, buildFlagship, buildStructure, starGlow, type Flagship } from './spacecraft';
+import type { SearchTarget } from './search';
 
 const SHIP_SPEED = 170;
 const ARRIVE = 22;
@@ -20,6 +21,8 @@ export interface UniverseEvents {
   onGalaxy(g: Galaxy | null): void;
   /** la nave llegó a un astro del atlas (o se alejó: null) */
   onStar(s: Star | null): void;
+  /** rumbo activo hacia un destino buscado: nombre, distancia restante y segundos estimados (null = sin rumbo) */
+  onRoute?(r: { label: string; dist: number; eta: number; color: string } | null): void;
 }
 
 interface NodeView { node: WorldNode; obj: THREE.Group; core: THREE.Mesh; ring: THREE.Mesh; tick(t: number): void; label: HTMLDivElement; pos: THREE.Vector3 }
@@ -86,6 +89,8 @@ export class Universe {
   private tailWorld = new THREE.Vector3();
   private shipVel = new THREE.Vector3();
   private autopilot: THREE.Vector3 | null = null;
+  /** destino buscado: marcador en el objetivo y línea de ruta desde la nave */
+  private route: { target: SearchTarget; marker: THREE.Group; line: THREE.Line; color: THREE.Color } | null = null;
   private nodes: NodeView[] = [];
   private galaxyLabels: { g: Galaxy; el: HTMLDivElement }[] = [];
   private labels: HTMLDivElement;
@@ -231,6 +236,74 @@ export class Universe {
     }
   }
 
+  /** todo lo que se puede buscar, con su posición en el mapa */
+  targets(): SearchTarget[] {
+    const out: SearchTarget[] = [];
+    for (const g of GALAXIES) out.push({ kind: 'galaxy', ref: g.id, label: g.name, sub: 'Galaxia', tags: g.blurb, x: g.center[0], z: g.center[1], standoff: Math.min(90, g.radius * 0.5), color: g.color });
+    for (const n of NODES) {
+      const [x, z] = nodeWorldPos(n);
+      const g = galaxyOf(n.galaxy);
+      out.push({ kind: 'node', ref: n.id, label: n.name, sub: g.name, tags: n.kind, x, z, standoff: ARRIVE * 0.6, color: g.color });
+    }
+    const a = this.atlas;
+    if (a) for (const st of this.stars) {
+      const g = galaxyOf(st.galaxy);
+      if (st.kind === 'project') {
+        const p = a.projects[st.index];
+        out.push({ kind: 'project', ref: st.index, label: p.n, sub: `${g.name} · ${p.down ? 'web caída' : STATUS_INFO[p.st].label}`, tags: `${p.t.join(' ')} ${p.c} ${p.by ?? ''}`, x: st.x, z: st.z, standoff: st.size + 5, color: g.color });
+      } else {
+        const p = a.partners[st.index];
+        out.push({ kind: 'partner', ref: st.index, label: p.n, sub: `${g.name} · socio`, tags: `${p.type} ${p.regions.join(' ')}`, x: st.x, z: st.z, standoff: st.size + 5, color: g.color });
+      }
+    }
+    return out;
+  }
+
+  /** pone rumbo a un destino: la nave vuela sola hasta él, con un marcador y la ruta dibujada */
+  navigate(t: SearchTarget) {
+    this.clearRoute();
+    const from = this.ship.position;
+    const dx = t.x - from.x, dz = t.z - from.z, d = Math.hypot(dx, dz) || 1;
+    // se detiene a `standoff` del objetivo, del lado por el que llega
+    const stop = Math.min(t.standoff, d);
+    this.autopilot = new THREE.Vector3(t.x - (dx / d) * stop, 4, t.z - (dz / d) * stop);
+    const color = new THREE.Color(t.color ?? '#fdda24');
+    const marker = new THREE.Group();
+    const mat = (o: number) => new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.2), transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 2.2, 90, 16, 1, true), mat(0.22));
+    beam.position.y = 45;
+    marker.add(beam);
+    const r = Math.max(8, t.standoff * 0.9);
+    for (const [k, o] of [[1, 0.7], [1.35, 0.35]] as const) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r * k - 0.5, r * k, 64), mat(o));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 1;
+      marker.add(ring);
+    }
+    marker.position.set(t.x, 0, t.z);
+    this.root.add(marker);
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([from.clone(), new THREE.Vector3(t.x, 4, t.z)]),
+      new THREE.LineDashedMaterial({ color: color.clone().multiplyScalar(1.1), dashSize: 6, gapSize: 5, transparent: true, opacity: 0.75, depthWrite: false }));
+    line.computeLineDistances();
+    line.frustumCulled = false;
+    this.root.add(line);
+    this.route = { target: t, marker, line, color };
+  }
+
+  private clearRoute() {
+    if (!this.route) return;
+    for (const o of [this.route.marker, this.route.line]) {
+      this.root.remove(o);
+      o.traverse(x => {
+        const m = x as THREE.Mesh;
+        m.geometry?.dispose();
+        (m.material as THREE.Material | undefined)?.dispose();
+      });
+    }
+    this.route = null;
+    this.ev.onRoute?.(null);
+  }
+
   starName(s: Star): string {
     return s.kind === 'project' ? this.atlas!.projects[s.index].n : this.atlas!.partners[s.index].n;
   }
@@ -238,7 +311,7 @@ export class Universe {
   /** vuela hacia un astro del atlas (desde el Observatorio o desde una ficha) */
   flyToStar(kind: Star['kind'], index: number) {
     const s = this.stars.find(x => x.kind === kind && x.index === index);
-    if (s) { this.autopilot = new THREE.Vector3(s.x, 4, s.z + s.size + 4); return; }
+    if (s) { const t = this.targets().find(x => x.kind === kind && x.ref === index); if (t) this.navigate(t); return; }
     // el proyecto es un nodo curado del mapa
     const slug = kind === 'project' ? this.atlas?.projects[index]?.s : undefined;
     const n = slug ? NODES.find(x => nodeSlug(x.id) === slug) : undefined;
@@ -281,8 +354,8 @@ export class Universe {
   }
 
   flyTo(n: WorldNode) {
-    const [x, z] = nodeWorldPos(n);
-    this.autopilot = new THREE.Vector3(x, 4, z + ARRIVE * 0.6);
+    const t = this.targets().find(x => x.kind === 'node' && x.ref === n.id);
+    if (t) this.navigate(t);
   }
 
   private bindInput() {
@@ -364,9 +437,9 @@ export class Universe {
       return;
     }
     const star = this.pickStar();
-    if (star) { this.autopilot = new THREE.Vector3(star.x, 4, star.z + star.size + 4); return; }
+    if (star) { this.flyToStar(star.kind, star.index); return; }
     const p = new THREE.Vector3();
-    if (this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -4), p)) this.autopilot = p;
+    if (this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -4), p)) { this.clearRoute(); this.autopilot = p; }
   }
 
   update(dt: number) {
@@ -378,12 +451,14 @@ export class Universe {
     const want = new THREE.Vector3();
     if (!this.frozen && (f || r)) {
       this.autopilot = null;
+      if (this.route) this.clearRoute();
       want.set(Math.cos(rig.yaw) * r - Math.sin(rig.yaw) * f, 0, -Math.sin(rig.yaw) * r - Math.cos(rig.yaw) * f).normalize().multiplyScalar(SHIP_SPEED);
     } else if (this.autopilot) {
       const d = this.autopilot.clone().sub(this.ship.position).setY(0);
       const len = d.length();
-      if (len < 2) this.autopilot = null;
-      else want.copy(d.normalize().multiplyScalar(Math.min(SHIP_SPEED, len * 2.2)));
+      if (len < 2) { this.autopilot = null; if (this.route) this.clearRoute(); }
+      // crucero: en viajes largos acelera hasta 5× y frena al acercarse
+      else want.copy(d.normalize().multiplyScalar(Math.min(SHIP_SPEED * THREE.MathUtils.clamp(len / 220, 1, 5), len * 2.2)));
     }
     this.shipVel.lerp(want, 1 - Math.exp(-dt * 4));
     this.ship.position.addScaledVector(this.shipVel, dt);
@@ -395,6 +470,18 @@ export class Universe {
       this.ship.rotation.y += (Math.atan2(Math.sin(yaw - this.ship.rotation.y), Math.cos(yaw - this.ship.rotation.y))) * Math.min(1, dt * 6);
     }
     rig.lookAt(this.ship.position.x, this.ship.position.z);
+    if (this.route) {
+      const { target, marker, line } = this.route;
+      marker.rotation.y = this.t * 0.6;
+      marker.children.forEach((c, i) => { if (i > 0) c.scale.setScalar(1 + Math.sin(this.t * 3 + i) * 0.04); });
+      const pos = line.geometry.attributes.position as THREE.BufferAttribute;
+      pos.setXYZ(0, this.ship.position.x, 4, this.ship.position.z);
+      pos.needsUpdate = true;
+      line.computeLineDistances();
+      const left = this.autopilot ? Math.hypot(this.autopilot.x - this.ship.position.x, this.autopilot.z - this.ship.position.z) : 0;
+      const sp = Math.max(SHIP_SPEED, this.shipVel.length());
+      this.ev.onRoute?.({ label: target.label, dist: left, eta: left / sp, color: target.color ?? '#fdda24' });
+    }
 
     for (const [i, grp] of this.galaxyGroups.entries()) grp.rotation.y = this.t * 0.02 * (i % 2 ? 1 : -1);
     for (const v of this.nodes) v.tick(this.t);
@@ -482,6 +569,7 @@ export class Universe {
   }
 
   dispose() {
+    this.clearRoute();
     this.cleanup.forEach(f => f());
     this.space.scene.remove(this.root);
     this.root.traverse(o => {
