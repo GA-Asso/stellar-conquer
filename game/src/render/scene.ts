@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { MAP_HALF } from '../sim/defs';
@@ -140,6 +141,12 @@ export function createSpaceScene(host: HTMLElement): SpaceScene {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#03040a');
+  // reflejos de entorno: un estudio procedural (sin archivos) da a los metales brillo y lectura de volumen;
+  // la intensidad baja mantiene el espacio oscuro
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.12;
+  pmrem.dispose();
   scene.fog = new THREE.FogExp2(0x05060f, 0.0011);
   const camera = new THREE.PerspectiveCamera(50, 1, 1, 6000);
   const rig = new OrbitRig(camera);
