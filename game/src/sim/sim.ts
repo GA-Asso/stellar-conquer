@@ -1,6 +1,6 @@
 // Motor de la simulación: un paso fijo a 20 Hz. Recibe comandos y avanza el estado.
 import {
-  BEACON_LEDGERS_TO_WIN, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
+  BEACON_LEDGERS_TO_WIN, DEPOSITS, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
 } from './defs';
 import { hexDist, hexKey, hexNeighbors, hexToWorld, worldToHex } from './hex';
 import { Rng } from './rng';
@@ -117,18 +117,28 @@ export function createSim(seed = 1): SimState {
   // campos propios: Lumens cerca, metal un poco más lejos
   const c0 = core0.pos;
   const nearFields: [Vec, AsteroidKind, number, number][] = [
-    [{ x: c0.x + 62, z: c0.z + 8 }, 'lumen', 7, 12],
-    [{ x: c0.x - 6, z: c0.z - 64 }, 'metal', 6, 11],
-    [{ x: c0.x + 95, z: c0.z - 70 }, 'lumen', 6, 12],
-    [{ x: c0.x - 30, z: c0.z - 135 }, 'metal', 7, 14],
+    [{ x: c0.x + 62, z: c0.z + 8 }, 'lumen', 9, 13],
+    [{ x: c0.x - 6, z: c0.z - 64 }, 'metal', 8, 12],
+    [{ x: c0.x + 50, z: c0.z + 55 }, 'energy', 4, 7],
+    [{ x: c0.x + 95, z: c0.z - 70 }, 'lumen', 8, 13],
+    [{ x: c0.x - 30, z: c0.z - 135 }, 'metal', 9, 15],
+    [{ x: c0.x + 140, z: c0.z - 15 }, 'metal', 6, 11],
+    [{ x: c0.x + 40, z: c0.z - 115 }, 'energy', 5, 8],
   ];
   for (const [center, res, n, spread] of nearFields) {
     const pts = field(center, res, n, spread);
     for (const p of pts) addAsteroid(s, res, mirror(p), rng);
   }
   // campos centrales disputados
-  for (const [center, res] of [[{ x: -35, z: -40 }, 'lumen'], [{ x: 70, z: 25 }, 'metal']] as [Vec, AsteroidKind][]) {
-    const pts = field(center, res, 8, 15);
+  const contested: [Vec, AsteroidKind, number, number][] = [
+    [{ x: -35, z: -40 }, 'lumen', 10, 16],
+    [{ x: 70, z: 25 }, 'metal', 10, 16],
+    [{ x: 30, z: -45 }, 'energy', 6, 9],
+    [{ x: -90, z: 65 }, 'lumen', 7, 12],
+    [{ x: -120, z: -45 }, 'energy', 4, 7],
+  ];
+  for (const [center, res, n, spread] of contested) {
+    const pts = field(center, res, n, spread);
     for (const p of pts) addAsteroid(s, res, mirror(p), rng);
   }
 
@@ -159,7 +169,7 @@ function mkPlayer(side: Side): Player {
 function addAsteroid(s: SimState, res: AsteroidKind, pos: Vec, rng: Rng) {
   const a: Asteroid = {
     id: s.nextId++, kind: 'asteroid', res, pos: { ...pos },
-    amount: res === 'lumen' ? 450 : 500, radius: rng.range(2.6, 4.2),
+    amount: DEPOSITS[res].amount, radius: res === 'energy' ? rng.range(2.2, 3.2) : rng.range(2.6, 4.2),
   };
   s.entities.set(a.id, a);
 }
@@ -587,8 +597,7 @@ function stepGather(s: SimState, u: Unit, o: Extract<Unit['order'], { kind: 'gat
     if (!drop) { u.order = { kind: 'idle' }; return; }
     if (!moveTowards(u, drop.pos, MODULES[drop.type].radius + 2.5)) return;
     if (u.carry) {
-      const key = u.carry.res === 'lumen' ? 'lumens' : 'metal';
-      pl.res[key] += u.carry.amount;
+      pl.res[DEPOSITS[u.carry.res].key] += u.carry.amount;
       u.carry = null;
     }
     const a = s.entities.get(o.target);

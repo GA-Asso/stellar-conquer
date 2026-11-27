@@ -1,6 +1,6 @@
 // HUD: recursos, ledger, panel de selección, botonera de órdenes, minimapa y avisos.
 import { Vector3 } from 'three';
-import { ERA_UP, ERAS, LEDGER_TICKS, MAP_HALF, MODULES, TICK_HZ, UNITS } from '../sim/defs';
+import { DEPOSITS, ERA_UP, ERAS, LEDGER_TICKS, MAP_HALF, MODULES, TICK_HZ, UNITS } from '../sim/defs';
 import { canAfford, coreOf, hasBuilt, popCap, popUsed } from '../sim/sim';
 import type { Command, Entity, Module, ModuleType, Res, Side, SimState, Unit, UnitType } from '../sim/types';
 import type { GameView } from '../render/view';
@@ -225,7 +225,7 @@ export class Hud {
       const e = sel[0];
       if (e.kind === 'unit') {
         const d = UNITS[e.type];
-        const task = e.order.kind === 'gather' ? (e.carry ? `Minando ${e.carry.res === 'lumen' ? 'Lumens' : 'metal'} (${Math.floor(e.carry.amount)})` : 'Minando')
+        const task = e.order.kind === 'gather' ? (e.carry ? `Minando ${DEPOSITS[e.carry.res].short} (${Math.floor(e.carry.amount)})` : 'Minando')
           : e.order.kind === 'build' ? 'Ensamblando' : e.order.kind === 'attack' ? 'Atacando' : e.order.kind === 'move' ? 'En ruta' : 'En espera';
         const hint = e.side !== this.side ? 'Unidad enemiga: selecciona tus tropas y haz clic derecho sobre ella para atacarla.'
           : e.type === 'drone' ? 'Clic derecho en un asteroide para minar · elige un módulo a la derecha para construir · clic derecho en un módulo dañado para repararlo.'
@@ -249,7 +249,7 @@ export class Hud {
           : e.type === 'lab' ? 'Ya puedes avanzar de era: selecciona el Núcleo y pulsa «Avanzar».' : MODULE_HELP[e.type];
         html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, extra, hint);
       } else if (e.kind === 'asteroid') {
-        html = this.card(e.res === 'lumen' ? 'Asteroide de Lumen' : 'Asteroide metálico', `Quedan ${Math.floor(e.amount)} unidades.`, 0, 0, -1, '',
+        html = this.card(DEPOSITS[e.res].name, `Quedan ${Math.floor(e.amount)} unidades.`, 0, 0, -1, '',
           'Selecciona drones y haz clic derecho sobre él para minarlo.');
       } else {
         const owner = e.owner === -1 ? 'Neutral' : e.owner === this.side ? 'Tuyo' : 'Del rival';
@@ -341,9 +341,9 @@ export class Hud {
     const hasArmy = this.input.selectedUnits().some(u => u.type !== 'drone');
     let name = '', act = '', cls = '';
     if (e.kind === 'asteroid') {
-      name = e.res === 'lumen' ? 'Asteroide de Lumen' : 'Asteroide metálico';
+      name = DEPOSITS[e.res].name;
       act = hasDrones ? 'Clic derecho: minar' : 'Selecciona drones para minarlo';
-      cls = e.res === 'lumen' ? 'lumen' : 'metal';
+      cls = e.res;
     } else if (e.kind === 'planet') {
       name = `Planeta ${e.name}` + (e.owner === this.side ? ' (tuyo)' : e.owner === -1 ? ' (neutral)' : ' (rival)');
       act = 'Conquístalo con robots en su órbita';
@@ -389,7 +389,7 @@ export class Hud {
     const col = (side: number) => side === 0 ? '#2ee6ff' : side === 1 ? '#ff3d8b' : '#9aa3c7';
     for (const e of s.entities.values()) {
       const p = this.toMini(e.pos.x, e.pos.z);
-      if (e.kind === 'asteroid') { c.fillStyle = e.res === 'lumen' ? '#c9a91c' : '#8a5a3a'; c.fillRect(p.x - 1, p.y - 1, 2, 2); }
+      if (e.kind === 'asteroid') { c.fillStyle = DEPOSITS[e.res].color; c.fillRect(p.x - 1, p.y - 1, 2, 2); }
       else if (e.kind === 'planet') {
         c.beginPath(); c.arc(p.x, p.y, e.radius * W / (MAP_HALF * 2), 0, Math.PI * 2);
         c.fillStyle = e.owner === -1 ? '#3a3f5c' : col(e.owner); c.globalAlpha = 0.6; c.fill(); c.globalAlpha = 1;

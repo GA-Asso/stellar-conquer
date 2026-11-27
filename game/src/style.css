@@ -141,7 +141,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .hover-label.show { display: flex; }
 .hover-label span { color: var(--muted); font-size: 11px; }
 .hover-label.ally b { color: var(--ally); } .hover-label.enemy b { color: var(--enemy); }
-.hover-label.lumen b { color: var(--stellar); } .hover-label.metal b { color: #d0946a; }
+.hover-label.lumen b { color: var(--stellar); } .hover-label.metal b { color: #d0946a; } .hover-label.energy b { color: #a58bff; }
 
 details.help { position: absolute; right: 12px; top: 54px; width: 340px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
 details.help summary { cursor: pointer; padding: 7px 12px; color: var(--muted); list-style: none; text-align: right; }

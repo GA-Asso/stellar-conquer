@@ -1,5 +1,5 @@
 // Catálogo de unidades, módulos y eras. Los nombres vienen del ecosistema Stellar.
-import type { Era, ModuleType, Res, UnitType } from './types';
+import type { AsteroidKind, Era, ModuleType, Res, ResKey, UnitType } from './types';
 
 export const TICK_HZ = 20;
 export const DT = 1 / TICK_HZ;
@@ -38,7 +38,7 @@ export interface UnitDef {
 
 export const UNITS: Record<UnitType, UnitDef> = {
   drone: {
-    name: 'Dron Ancla', desc: 'Recolecta Lumens y metal, y ensambla módulos.',
+    name: 'Dron Ancla', desc: 'Recolecta Lumens, metal y cristales de energía, y ensambla módulos.',
     cls: 'worker', cost: cost(50), pop: 1, hp: 45, speed: 16, damage: 2, range: 5, cooldown: 1.2, sight: 40,
     trainTime: 10, era: 1, radius: 1.6, vsModule: 1, vsShip: 1, weapon: 'laser', hotkey: 'Q',
   },
@@ -153,6 +153,13 @@ export const GATHER = {
   rate: 1.6,
   reach: 4,
   labBonus: 0.2,
+};
+
+// recursos minables: qué casilla del almacén llenan, cómo se llaman y cuánto trae cada roca
+export const DEPOSITS: Record<AsteroidKind, { key: ResKey; name: string; short: string; amount: number; color: string }> = {
+  lumen: { key: 'lumens', name: 'Asteroide de Lumen', short: 'Lumens', amount: 600, color: '#c9a91c' },
+  metal: { key: 'metal', name: 'Asteroide metálico', short: 'metal', amount: 650, color: '#8a5a3a' },
+  energy: { key: 'energy', name: 'Cristal de energía', short: 'energía', amount: 320, color: '#7d5cff' },
 };
 
 export const PLANET = {

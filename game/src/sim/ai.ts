@@ -4,7 +4,7 @@ import { hexDist, worldToHex } from './hex';
 import {
   asteroids, canAfford, canPlace, coreOf, dist, freePorts, modules, planets, popCap, popUsed, units,
 } from './sim';
-import type { Command, ModuleType, Side, SimState, Unit, UnitType, Vec } from './types';
+import type { AsteroidKind, Command, ModuleType, Side, SimState, Unit, UnitType, Vec } from './types';
 
 export type Difficulty = 'facil' | 'normal' | 'dificil';
 
@@ -93,7 +93,16 @@ export function aiThink(s: SimState, mem: AiMemory): Command[] {
       const t = d.order.kind === 'gather' ? s.entities.get(d.order.target) : undefined;
       return t?.kind === 'asteroid' && t.res === 'lumen';
     }).length;
+    // un par de drones a los cristales cuando la energía escasea
+    let onEnergy = gathering.filter(d => {
+      const t = d.order.kind === 'gather' ? s.entities.get(d.order.target) : undefined;
+      return t?.kind === 'asteroid' && t.res === 'energy';
+    }).length;
     for (const d of idle) {
+      if (pl.res.energy < 150 && onEnergy < 2) {
+        const e = bestAsteroid(s, side, 'energy');
+        if (e) { out.push({ kind: 'gather', units: [d.id], target: e }); onEnergy++; continue; }
+      }
       const res = onLumen <= gathering.length - onLumen ? 'lumen' : 'metal';
       const a = bestAsteroid(s, side, res) ?? bestAsteroid(s, side, res === 'lumen' ? 'metal' : 'lumen');
       if (a) out.push({ kind: 'gather', units: [d.id], target: a });
@@ -161,7 +170,7 @@ function closest(list: Unit[], p: Vec): Unit | undefined {
   return best;
 }
 
-function bestAsteroid(s: SimState, side: Side, res: 'lumen' | 'metal'): number | null {
+function bestAsteroid(s: SimState, side: Side, res: AsteroidKind): number | null {
   const drops = modules(s, side).filter(m => m.built >= 1 && MODULES[m.type].dropsite);
   let best: number | null = null, bd = Infinity;
   for (const a of asteroids(s)) {

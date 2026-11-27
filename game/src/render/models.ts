@@ -502,6 +502,13 @@ const ASTEROID_MATS = {
   }),
   metalRock: new THREE.MeshStandardMaterial({ color: 0x5b524c, roughness: 0.95, metalness: 0, flatShading: true }),
   ore: new THREE.MeshStandardMaterial({ color: 0xc8804c, roughness: 0.45, metalness: 0.55, flatShading: true }),
+  // energía: cristal violeta casi translúcido sobre un zócalo de roca oscura
+  energyRock: new THREE.MeshStandardMaterial({ color: 0x1e1a33, roughness: 0.9, metalness: 0.1, flatShading: true }),
+  energy: new THREE.MeshStandardMaterial({
+    color: 0xb9a4ff, emissive: new THREE.Color('#7d5cff'), emissiveIntensity: 1.1, roughness: 0.15, metalness: 0,
+    transparent: true, opacity: 0.88, flatShading: true,
+  }),
+  energyCore: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.3, 3.2) }),
 };
 
 let haloTex: THREE.Texture | null = null;
@@ -570,6 +577,29 @@ export function buildAsteroid(kind: AsteroidKind, radius: number, seed: number):
   let st = seed * 9301 + 49297;
   const rnd = () => { st = (st * 16807) % 2147483647; return st / 2147483647; };
   const g = new THREE.Group();
+  if (kind === 'energy') {
+    // zócalo bajo de roca y un cristal bipiramidal que flota encima, con esquirlas en órbita
+    const base = new THREE.Mesh(rockGeometry(radius * 0.8, seed), ASTEROID_MATS.energyRock);
+    base.scale.y = 0.55;
+    g.add(base);
+    const gem = new THREE.Group();
+    gem.name = 'gem';
+    gem.position.y = radius * 1.25;
+    const body = new THREE.Mesh(new THREE.OctahedronGeometry(radius * 0.75, 0), ASTEROID_MATS.energy);
+    body.scale.y = 1.7;
+    gem.add(body);
+    gem.add(new THREE.Mesh(new THREE.OctahedronGeometry(radius * 0.28, 0), ASTEROID_MATS.energyCore));
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + rnd();
+      const sh = new THREE.Mesh(new THREE.TetrahedronGeometry(radius * (0.14 + rnd() * 0.1), 0), ASTEROID_MATS.energy);
+      sh.position.set(Math.cos(a) * radius * 1.15, (rnd() - 0.5) * radius * 0.9, Math.sin(a) * radius * 1.15);
+      sh.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+      gem.add(sh);
+    }
+    gem.add(halo('#7d5cff', radius * 4.2));
+    g.add(gem);
+    return g;
+  }
   g.add(new THREE.Mesh(rockGeometry(radius, seed), kind === 'lumen' ? ASTEROID_MATS.lumenRock : ASTEROID_MATS.metalRock));
   if (kind === 'lumen') {
     // geoda: un racimo de prismas que nacen de un mismo punto en la cara superior

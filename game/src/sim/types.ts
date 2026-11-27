@@ -7,7 +7,7 @@ export type Res = Record<ResKey, number>;
 
 export type UnitType = 'drone' | 'interceptor' | 'mecha' | 'frigate' | 'titan' | 'dreadnought';
 export type ModuleType = 'core' | 'habitat' | 'solar' | 'anchor' | 'hangar' | 'factory' | 'lab' | 'turret' | 'beacon';
-export type AsteroidKind = 'lumen' | 'metal';
+export type AsteroidKind = 'lumen' | 'metal' | 'energy';
 export type Era = 1 | 2 | 3 | 4;
 
 export interface Vec { x: number; z: number }

@@ -3,11 +3,17 @@ import * as THREE from 'three';
 import { MODULES, UNITS } from '../sim/defs';
 import { hexToWorld } from '../sim/hex';
 import { coreOf, dist } from '../sim/sim';
-import type { Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
+import type { AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
 import { Fx } from './fx';
 import { iconSprite, MODULE_GLYPH } from './icons';
 import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, type Spin } from './models';
 import type { SpaceScene } from './scene';
+
+const CARGO_COLORS: Record<AsteroidKind, THREE.Color> = {
+  lumen: new THREE.Color(2.2, 1.8, 0.3),
+  metal: new THREE.Color(1.1, 0.6, 0.35),
+  energy: new THREE.Color(1.4, 1.1, 3),
+};
 
 interface View {
   root: THREE.Group;
@@ -189,6 +195,9 @@ export class GameView {
         if (k >= 1 && e.parent !== null && !this.connectors.has(e.id)) this.addConnector(s, e.id, e.parent);
       } else if (e.kind === 'asteroid') {
         v.model.rotation.y += dt * 0.08;
+        // el cristal de energía flota y gira por su cuenta
+        const gem = e.res === 'energy' ? v.model.getObjectByName('gem') : undefined;
+        if (gem) { gem.rotation.y += dt * 0.9; gem.position.y = e.radius * 1.25 + Math.sin(t * 1.8 + v.phase) * 0.5; }
         const k = Math.max(0.35, Math.sqrt(e.amount / (v.startAmount ?? e.amount)));
         v.model.scale.setScalar(k);
       } else if (e.kind === 'planet' && v.planet) {
@@ -252,7 +261,7 @@ export class GameView {
           cargo.position.set(0, -1.2, 0);
           v.model.add(cargo);
         }
-        (cargo.material as THREE.MeshBasicMaterial).color.set(u.carry.res === 'lumen' ? new THREE.Color(2.2, 1.8, 0.3) : new THREE.Color(1.1, 0.6, 0.35));
+        (cargo.material as THREE.MeshBasicMaterial).color.copy(CARGO_COLORS[u.carry.res]);
         cargo.visible = true;
         cargo.rotation.y += dt * 4;
       } else if (cargo) cargo.visible = false;
