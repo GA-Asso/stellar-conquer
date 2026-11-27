@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { MODULES, UNITS } from '../sim/defs';
 import { hexToWorld } from '../sim/hex';
 import { coreOf, dist } from '../sim/sim';
-import type { AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
+import type { Asteroid, AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
 import { Fx } from './fx';
 import { iconSprite, MODULE_GLYPH } from './icons';
 import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, unitShadow, type Spin } from './models';
@@ -27,6 +27,8 @@ interface View {
   startAmount?: number;
   phase: number;
   smooth?: { x: number; z: number };
+  /** altura extra para pasar por encima de un asteroide (solo visual) */
+  lift?: number;
 }
 
 export function altitude(e: Entity, t = 0, phase = 0): number {
@@ -174,6 +176,8 @@ export class GameView {
     this.time += dt;
     const t = this.time;
     this.scenery.update(t, dt);
+    const rocks: Asteroid[] = [];
+    for (const e of s.entities.values()) if (e.kind === 'asteroid') rocks.push(e);
     const alive = new Set<number>();
     for (const e of s.entities.values()) {
       alive.add(e.id);
@@ -187,7 +191,19 @@ export class GameView {
         v.smooth.z += (p.z - v.smooth.z) * k;
         p = v.smooth;
       }
-      v.root.position.set(p.x, altitude(e, t, v.phase), p.z);
+      let y = altitude(e, t, v.phase);
+      if (e.kind === 'unit') {
+        // las naves sobrevuelan las rocas: suben suave al pasar encima y vuelven a bajar
+        let want = 0;
+        const ur = UNITS[e.type].radius;
+        for (const a of rocks) {
+          const d = Math.hypot(a.pos.x - p.x, a.pos.z - p.z), reach = a.radius + ur;
+          if (d < reach) want = Math.max(want, (a.radius * 2.2 + 2 - (y - 2)) * Math.min(1, (reach - d) / (ur + 1)));
+        }
+        v.lift = (v.lift ?? 0) + (Math.max(0, want) - (v.lift ?? 0)) * Math.min(1, dt * 5);
+        y += v.lift;
+      }
+      v.root.position.set(p.x, y, p.z);
       for (const sp of v.spins) sp.obj.rotation[sp.axis] += sp.speed * dt;
       if (v.tick && (e.kind !== 'module' || e.built >= 1)) v.tick(t);
 

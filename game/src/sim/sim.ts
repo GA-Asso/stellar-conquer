@@ -363,7 +363,9 @@ export function step(s: SimState, cmds: SideCommand[] = []) {
   for (const c of cmds) applyCommand(s, c.side, c.cmd);
   obstacles = [];
   moving.clear();
-  for (const e of s.entities.values()) if (e.kind === 'asteroid' || e.kind === 'planet') obstacles.push(e);
+  // solo los planetas estorban al vuelo: las naves pasan por encima de los asteroides (en un campo denso,
+  // esquivar roca a roca las dejaba rebotando y atascadas)
+  for (const e of s.entities.values()) if (e.kind === 'planet') obstacles.push(e);
 
   for (const e of [...s.entities.values()]) {
     if (!s.entities.has(e.id)) continue;
@@ -444,7 +446,7 @@ function reap(s: SimState) {
   }
 }
 
-let obstacles: (Asteroid | Planet)[] = [];
+let obstacles: Planet[] = [];
 // unidades que se movieron por su cuenta este tick
 const moving = new Set<number>();
 
@@ -454,7 +456,7 @@ function moveTowards(u: Unit, to: Vec, stop: number): boolean {
   // tolerancia: la separación entre unidades puede alejarla unas décimas del punto exacto
   if (d <= stop + 0.4) return true;
   let nx = dx / d, nz = dz / d;
-  // rodea el obstáculo más cercano que corte el camino (módulos, asteroides, planetas)
+  // rodea el planeta más cercano que corte el camino
   const ur = UNITS[u.type].radius;
   const look = Math.min(d, 30);
   let block: { t: number; side: number; r: number; ox: number; oz: number } | null = null;
@@ -781,7 +783,7 @@ function separate(s: SimState) {
       b.pos.x += nx * push; b.pos.z += nz * push;
     }
   }
-  // las unidades vuelan por encima de la estación: solo asteroides y planetas estorban
+  // las unidades vuelan por encima de la estación y de los asteroides: solo los planetas estorban
   for (const e of obstacles) {
     const re = radiusOf(e);
     for (const u of us) {

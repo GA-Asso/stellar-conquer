@@ -80,3 +80,25 @@ describe('movimiento de grupo', () => {
     expect(minD).toBeGreaterThan(2);
   });
 });
+
+describe('vuelo sobre asteroides', () => {
+  it('un grupo cruza un campo de asteroides denso sin atascarse', () => {
+    const s = createSim(11);
+    const ids = [...spawnGroup(s, 'interceptor', 8), ...spawnGroup(s, 'frigate', 4), ...spawnGroup(s, 'mecha', 6)];
+    // planta un campo denso justo en medio del camino
+    const a = ids.map(id => s.entities.get(id) as Unit)[0];
+    const to = { x: a.pos.x + 120, z: a.pos.z + 40 };
+    const proto = [...s.entities.values()].find(e => e.kind === 'asteroid')!;
+    for (let i = 0; i < 40; i++) {
+      const id = s.nextId++;
+      s.entities.set(id, { ...structuredClone(proto), id, pos: { x: a.pos.x + 40 + (i % 8) * 7, z: a.pos.z + 5 + Math.floor(i / 8) * 7 } });
+    }
+    step(s, [{ side: 0, cmd: { kind: 'move', units: ids, to } }]);
+    for (let t = 0; t < 30 * TICK_HZ; t++) step(s);
+    const near = ids.filter(id => {
+      const u = s.entities.get(id) as Unit;
+      return u.order.kind === 'idle' && Math.hypot(u.pos.x - to.x, u.pos.z - to.z) < 40;
+    }).length;
+    expect(near).toBe(ids.length);
+  });
+});
