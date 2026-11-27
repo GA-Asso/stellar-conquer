@@ -7,11 +7,18 @@ export interface RavenProject {
   s: string; n: string; c: string; t: string[]; d: string;
   st: 'L' | 'P' | 'D'; scf: number | null; tvl: number | null;
   au: { n: number; by: string[]; at: string | null } | null; r: number;
+  /** web oficial, GitHub, X y página del SCF (si la fuente los tiene) */
+  web?: string | null; gh?: string | null; x?: string | null; scfUrl?: string | null;
+  /** quién lo construye y fecha de la última actividad registrada */
+  by?: string | null; act?: string | null;
+  /** 1 si la web oficial no respondía cuando se generó la instantánea */
+  down?: 1;
 }
 export interface RavenPartner { n: string; type: string; tag: string; url: string | null; regions: string[]; ramps: string[] }
 export interface RavenSnapshot {
   generatedAt: string;
   source: { name: string; url: string; license: string };
+  sitesCheckedAt?: string; sitesDown?: number;
   totals: {
     projects: number; scfProjects: number; scfUSD: number; scfMeanUSD: number; tvlUSD: number; tvlProvider: string; tvlAsOf: string;
     hackathons: number; hackathonPrizeUSD: number; hackers: number; audits: number; stablecoins: number; rwaAssets: number; rwaIssuers: number; partners: number;

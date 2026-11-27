@@ -34,6 +34,7 @@ const trim = (s, n) => {
   const cut = s.slice(0, n);
   return cut.slice(0, cut.lastIndexOf(' ') > n * 0.6 ? cut.lastIndexOf(' ') : n).replace(/[,;:.\s]+$/, '') + '…';
 };
+const cleanUrl = u => (typeof u === 'string' && /^https?:\/\//.test(u.trim()) ? u.trim() : null);
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null);
 const STATUS = { Live: 'L', 'Pre-Release': 'P', Development: 'D' };
 
@@ -41,7 +42,7 @@ async function projects() {
   const out = [];
   for (const status of Object.keys(STATUS)) {
     for (let offset = 0; ; offset += 100) {
-      const d = await get(`projects/search?status=${encodeURIComponent(status)}&view=compact&limit=100&offset=${offset}`);
+      const d = await get(`projects/search?status=${encodeURIComponent(status)}&limit=100&offset=${offset}`);
       for (const p of d.projects) {
         if (out.some(x => x.s === p.slug)) continue;
         out.push({
@@ -54,13 +55,48 @@ async function projects() {
           scf: num(p.scfTotalAwardedUSD),
           tvl: num(p.tvlUSD),
           au: p.audits?.count ? { n: p.audits.count, by: p.audits.auditors ?? [], at: p.audits.latestAt ?? null } : null,
-          r: p.reposCount ?? 0,
+          r: p.reposCount ?? p.repos?.length ?? 0,
+          // enlaces propios del proyecto: así la ficha no depende de una sola fuente
+          web: cleanUrl(p.links?.website),
+          gh: cleanUrl(p.links?.github),
+          x: cleanUrl(p.links?.twitter),
+          scfUrl: cleanUrl(p.scfSourceUrl),
+          by: p.builtBy?.name ?? null,
+          act: p.lastActivityAt ? p.lastActivityAt.slice(0, 10) : null,
         });
       }
       if (offset + d.projects.length >= d.meta.counts.total || !d.projects.length) break;
     }
   }
   return out;
+}
+
+// Comprueba si la web oficial responde. Un proyecto con la web caída sigue en el mapa, pero la ficha lo
+// avisa y ofrece GitHub, X o el SCF en su lugar. Algunos sitios rechazan HEAD o bots: se reintenta con GET
+// y cualquier respuesta del servidor (incluso 400 o 403) cuenta como viva; solo DNS, TLS, conexión o 404/5xx la tumban.
+async function alive(url) {
+  for (const method of ['HEAD', 'GET']) {
+    try {
+      const r = await fetch(url, { method, redirect: 'follow', signal: AbortSignal.timeout(9000), headers: { 'user-agent': 'Mozilla/5.0 (compatible; stellar-conquer-snapshot)' } });
+      if (r.status < 400 || [400, 401, 403, 405, 429].includes(r.status)) return true;
+      if (method === 'GET') return false;
+    } catch {
+      if (method === 'GET') return false;
+    }
+  }
+  return false;
+}
+
+async function checkSites(list) {
+  const queue = list.filter(p => p.web);
+  let done = 0, dead = 0;
+  await Promise.all(Array.from({ length: 24 }, async () => {
+    for (let p; (p = queue.shift());) {
+      if (!(await alive(p.web))) { p.down = 1; dead++; }
+      if (++done % 100 === 0) console.log(`  webs comprobadas: ${done} (${dead} caídas)`);
+    }
+  }));
+  return dead;
 }
 
 async function main() {
@@ -75,12 +111,17 @@ async function main() {
     get('partners?limit=100'),
   ]);
 
+  const dead = await checkSites(list);
+  const checkedAt = new Date().toISOString().slice(0, 10);
+
   const auditsByFirm = {};
   for (const a of audits.audits) auditsByFirm[a.auditor] = (auditsByFirm[a.auditor] ?? 0) + 1;
 
   const snapshot = {
     generatedAt: new Date().toISOString(),
     source: { name: 'Stellar Scout (stellarlight.xyz) vía Raven', url: 'https://stellarlight.xyz', license: 'MIT' },
+    sitesCheckedAt: checkedAt,
+    sitesDown: dead,
     totals: {
       projects: eco.categories.totalProjects,
       scfProjects: eco.funding.scfAwardedProjects,
@@ -129,7 +170,7 @@ async function main() {
 
   await mkdir(dirname(OUT), { recursive: true });
   await writeFile(OUT, JSON.stringify(snapshot));
-  console.log(`raven.json: ${list.length} proyectos, ${snapshot.stablecoins.length} stablecoins, ${snapshot.hackathons.length} hackathons → ${OUT}`);
+  console.log(`raven.json: ${list.length} proyectos (${dead} con la web caída), ${snapshot.stablecoins.length} stablecoins, ${snapshot.hackathons.length} hackathons → ${OUT}`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
