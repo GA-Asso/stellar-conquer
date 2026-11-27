@@ -106,7 +106,8 @@ export type SimEvent =
   | { kind: 'trained'; id: number; side: Side }
   | { kind: 'ledger'; seq: number }
   | { kind: 'captured'; planet: number; side: Side }
-  | { kind: 'era'; side: Side; era: Era };
+  | { kind: 'era'; side: Side; era: Era }
+  | { kind: 'anomaly'; pos: Vec; res: AsteroidKind };
 
 export type Command =
   | { kind: 'move'; units: number[]; to: Vec; aggressive?: boolean }

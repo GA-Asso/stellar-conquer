@@ -129,3 +129,14 @@ describe('tecnología avanzada', () => {
     expect(hp - c.hp).toBeCloseTo(7 * 0.5 * 0.65, 3);
   });
 });
+
+describe('anomalías', () => {
+  it('cada 36 ledgers aparece un campo nuevo y su espejo', () => {
+    const s = createSim(31);
+    const n0 = asteroids(s).length;
+    let events = 0;
+    for (let t = 0; t < 36 * LEDGER_TICKS; t++) { step(s); events += s.events.filter(e => e.kind === 'anomaly').length; }
+    expect(events).toBe(2);
+    expect(asteroids(s).length).toBe(n0 + 10);
+  });
+});

@@ -1,6 +1,6 @@
 // Motor de la simulación: un paso fijo a 20 Hz. Recibe comandos y avanza el estado.
 import {
-  BEACON_LEDGERS_TO_WIN, DEPOSITS, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
+  ANOMALY, BEACON_LEDGERS_TO_WIN, DEPOSITS, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
 } from './defs';
 import { hexDist, hexKey, hexNeighbors, hexToWorld, worldToHex } from './hex';
 import { Rng } from './rng';
@@ -390,6 +390,7 @@ function closeLedger(s: SimState) {
   s.ledger++;
   s.events.push({ kind: 'ledger', seq: s.ledger });
   for (const p of planets(s)) if (p.owner !== -1) s.players[p.owner].res.lumens += PLANET.incomePerLedger;
+  if (s.ledger % ANOMALY.everyLedgers === 0) spawnAnomaly(s);
   for (const m of modules(s)) {
     const inc = MODULES[m.type].perLedger;
     if (inc && m.built >= 1) refund(s.players[m.side].res, inc);
@@ -402,6 +403,29 @@ function closeLedger(s: SimState) {
       s.winReason = 'El Faro de Consenso alcanzó el quórum';
     }
   }
+}
+
+// una anomalía: un campo nuevo en zona neutral y su espejo al otro lado del centro
+function spawnAnomaly(s: SimState) {
+  const rng = new Rng(s.rngState || s.seed || 1);
+  const kinds: AsteroidKind[] = ['energy', 'lumen', 'metal'];
+  const res = kinds[(s.ledger / ANOMALY.everyLedgers) % 3 | 0];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const a = rng.range(0, Math.PI * 2), r = rng.range(50, 150);
+    const c = { x: Math.cos(a) * r, z: Math.sin(a) * r };
+    const clear = (p: Vec) => [...s.entities.values()].every(e =>
+      e.kind === 'unit' || dist(e.pos, p) > (e.kind === 'planet' ? e.radius + 25 : e.kind === 'module' ? 35 : 18));
+    if (!clear(c) || !clear({ x: -c.x, z: -c.z })) continue;
+    for (const center of [c, { x: -c.x, z: -c.z }]) {
+      for (let i = 0; i < ANOMALY.rocks; i++) {
+        const b = rng.range(0, Math.PI * 2), d = rng.range(0, ANOMALY.spread);
+        addAsteroid(s, res, { x: center.x + Math.cos(b) * d, z: center.z + Math.sin(b) * d }, rng);
+      }
+      s.events.push({ kind: 'anomaly', pos: center, res });
+    }
+    break;
+  }
+  s.rngState = rng.state;
 }
 
 function reap(s: SimState) {

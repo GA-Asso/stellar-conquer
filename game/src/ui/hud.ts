@@ -172,6 +172,9 @@ export class Hud {
       if (ev.kind === 'era') {
         const who = ev.side === this.side ? 'Tu estación' : 'El rival';
         this.toast(`${who} avanza a la Era ${ERAS[ev.era].name}: ${ERAS[ev.era].lema}`, ev.side === this.side ? 'good' : 'bad');
+      } else if (ev.kind === 'anomaly') {
+        // las anomalías llegan en pareja (campo y espejo): un solo aviso
+        if (ev === s.events.find(x => x.kind === 'anomaly')) this.toast(`Anomalía detectada: apareció un campo de ${DEPOSITS[ev.res].short} en zona neutral (mira el minimapa)`, 'good');
       } else if (ev.kind === 'captured') {
         const p = s.entities.get(ev.planet);
         const name = p && p.kind === 'planet' ? p.name : 'un planeta';

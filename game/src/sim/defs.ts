@@ -197,6 +197,9 @@ export const DEPOSITS: Record<AsteroidKind, { key: ResKey; name: string; short: 
   energy: { key: 'energy', name: 'Cristal de energía', short: 'energía', amount: 320, color: '#7d5cff' },
 };
 
+// anomalías: cada tantos ledgers aparece un campo nuevo (y su espejo, para que sea justo)
+export const ANOMALY = { everyLedgers: 36, rocks: 5, spread: 9 };
+
 export const PLANET = {
   incomePerLedger: 15,
   captureRadius: 6,

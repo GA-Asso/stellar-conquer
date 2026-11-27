@@ -111,6 +111,7 @@ export class GameView {
           }
           break;
         }
+        case 'anomaly': this.fx.pulse(ev.pos, -1, 60); this.fx.pulse(ev.pos, -1, 30); break;
         case 'captured': {
           const p = s.entities.get(ev.planet);
           if (p) this.fx.pulse(p.pos, ev.side, 50);
