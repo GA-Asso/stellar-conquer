@@ -6,7 +6,7 @@ import { coreOf, dist } from '../sim/sim';
 import type { AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
 import { Fx } from './fx';
 import { iconSprite, MODULE_GLYPH } from './icons';
-import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, type Spin } from './models';
+import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, unitShadow, type Spin } from './models';
 import type { SpaceScene } from './scene';
 
 const CARGO_COLORS: Record<AsteroidKind, THREE.Color> = {
@@ -128,6 +128,8 @@ export class GameView {
       const b = buildUnit(e.type, e.side);
       const root = new THREE.Group();
       root.add(b.group);
+      // las naves y drones vuelan: su sombra de color queda en el plano; los robots ya llevan su disco
+      if (UNITS[e.type].cls !== 'robot') root.add(unitShadow(e.side, UNITS[e.type].radius));
       v = { root, model: b.group, spins: b.spins, engines: b.engines, phase: (e.id * 1.7) % 6.28 };
     } else if (e.kind === 'module') {
       const b = buildModule(e.type, e.side);
@@ -250,6 +252,8 @@ export class GameView {
     v.model.rotation.y += d * Math.min(1, dt * 8);
     const cls = UNITS[u.type].cls;
     if (cls === 'ship') v.model.rotation.z = -d * 0.6;
+    const shadow = v.root.getObjectByName('shadow');
+    if (shadow) shadow.position.y = 0.3 - v.root.position.y;
     if (v.engines) for (const e of v.engines) e.scale.setScalar(0.8 + Math.sin(t * 30 + v.phase) * 0.25);
     // los drones cargados llevan un cristal brillante
     if (u.type === 'drone') {

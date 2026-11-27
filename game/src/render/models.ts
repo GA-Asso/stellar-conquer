@@ -23,6 +23,10 @@ interface Mats {
   portal: THREE.MeshBasicMaterial;
   gunmetal: THREE.MeshStandardMaterial;
   pad: THREE.MeshBasicMaterial;
+  // placas oscuras de las unidades: no llegan al negro, para que no se lean como huecos desde arriba
+  plating: THREE.MeshStandardMaterial;
+  exhaust: THREE.MeshBasicMaterial;
+  joint: THREE.MeshStandardMaterial;
 }
 
 const matCache = new Map<Owner, Mats>();
@@ -42,6 +46,9 @@ export function mats(side: Owner): Mats {
     windows: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.95, 0.85, 0.6) }),
     furnace: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 0.9, 0.25) }),
     gunmetal: new THREE.MeshStandardMaterial({ color: 0x4a5163, metalness: 0.45, roughness: 0.55 }),
+    plating: new THREE.MeshStandardMaterial({ color: 0x3b4256, metalness: 0.55, roughness: 0.45, emissive: c, emissiveIntensity: 0.04 }),
+    exhaust: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.4), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }),
+    joint: new THREE.MeshStandardMaterial({ color: 0x262b3a, metalness: 0.7, roughness: 0.35, emissive: c, emissiveIntensity: 0.12 }),
     pad: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(0.8), transparent: true, opacity: 0.18, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }),
     portal: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.3), transparent: true, opacity: 0.55, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
@@ -52,6 +59,7 @@ export function mats(side: Owner): Mats {
 const box = (w: number, h: number, d: number, m: THREE.Material) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
 const cyl = (rt: number, rb: number, h: number, m: THREE.Material, seg = 16) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m);
 const sphere = (r: number, m: THREE.Material, w = 24, h = 16) => new THREE.Mesh(new THREE.SphereGeometry(r, w, h), m);
+const capsule = (r: number, len: number, m: THREE.Material) => new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, 12), m);
 const torus = (r: number, t: number, m: THREE.Material, seg = 48) => new THREE.Mesh(new THREE.TorusGeometry(r, t, 10, seg), m);
 
 function at<T extends THREE.Object3D>(o: T, x: number, y: number, z: number): T { o.position.set(x, y, z); return o; }
@@ -296,6 +304,37 @@ export function buildModule(type: ModuleType, side: Owner): ModuleModel {
   return { group: g, spins, tick };
 }
 
+let trailGeo: THREE.BufferGeometry | null = null;
+// cono unitario abierto que apunta hacia -z desde el origen
+function trailGeometry(): THREE.BufferGeometry {
+  trailGeo ??= new THREE.ConeGeometry(0.5, 1, 10, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.5);
+  return trailGeo;
+}
+
+// sombra de color del equipo bajo cada unidad: la ubica sobre el plano y la distingue del fondo
+let shadowTex: THREE.Texture | null = null;
+export function unitShadow(side: Owner, radius: number): THREE.Mesh {
+  if (!shadowTex) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x = c.getContext('2d')!;
+    const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,0.7)');
+    gr.addColorStop(0.55, 'rgba(255,255,255,0.22)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr;
+    x.fillRect(0, 0, 64, 64);
+    shadowTex = new THREE.CanvasTexture(c);
+  }
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({
+    map: shadowTex, color: SIDE_COLORS[side].clone().multiplyScalar(0.55), transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  mesh.scale.setScalar(radius * 3.2);
+  mesh.name = 'shadow';
+  return mesh;
+}
+
 // disco de levitación bajo los robots: marca que van en la capa baja, sobre el plano
 function hoverPad(m: Mats, r: number): THREE.Group {
   const g = new THREE.Group();
@@ -329,6 +368,10 @@ export function buildUnit(type: UnitType, side: Owner): { group: THREE.Group; sp
   const engine = (x: number, y: number, z: number, r: number) => {
     const e = at(sphere(r, m.glow, 10, 8), x, y, z);
     e.scale.z = 1.6;
+    // estela: cono aditivo que nace en la tobera y se desvanece hacia atrás
+    const trail = new THREE.Mesh(trailGeometry(), m.exhaust);
+    trail.scale.set(r * 1.6, r * 1.6, r * 4.5);
+    e.add(trail);
     g.add(e);
     engines.push(e);
   };
@@ -342,7 +385,7 @@ export function buildUnit(type: UnitType, side: Owner): { group: THREE.Group; sp
       g.add(band);
       g.add(at(sphere(0.42, m.glass, 10, 8), 0, 0.2, 0.95));
       for (const x of [-0.55, 0.55]) {
-        const claw = at(box(0.18, 0.18, 1.1, m.dark), x, -0.85, 0.55);
+        const claw = at(box(0.18, 0.18, 1.1, m.plating), x, -0.85, 0.55);
         claw.rotation.x = 0.5;
         g.add(claw);
       }
@@ -390,12 +433,12 @@ export function buildUnit(type: UnitType, side: Owner): { group: THREE.Group; sp
         const pod = cyl(0.6, 0.6, 5, m.trim, 8);
         pod.rotation.x = Math.PI / 2;
         g.add(at(pod, x, -0.2, -1.4));
-        g.add(at(box(1.2, 0.2, 1.4, m.dark), x * 0.7, -0.2, -1.4));
+        g.add(at(box(1.2, 0.2, 1.4, m.plating), x * 0.7, -0.2, -1.4));
         g.add(at(box(0.15, 0.15, 4.2, m.trim), x * 1.27, -0.2, -1.4));
         engine(x, -0.2, -4.1, 0.45);
       }
       const turret = at(new THREE.Group(), 0, 1.8, 1.4);
-      turret.add(cyl(0.8, 0.9, 0.6, m.dark, 10));
+      turret.add(cyl(0.8, 0.9, 0.6, m.plating, 10));
       for (const x of [-0.3, 0.3]) {
         const b = cyl(0.16, 0.16, 3, m.hull, 6);
         b.rotation.x = Math.PI / 2;
@@ -425,7 +468,7 @@ export function buildUnit(type: UnitType, side: Owner): { group: THREE.Group; sp
         const t = at(new THREE.Group(), 0, 3, z);
         t.add(cyl(1, 1.1, 0.7, m.hull, 10));
         for (const x of [-0.35, 0.35]) {
-          const b = cyl(0.18, 0.18, 3.2, m.dark, 6);
+          const b = cyl(0.18, 0.18, 3.2, m.plating, 6);
           b.rotation.x = Math.PI / 2;
           t.add(at(b, x, 0.2, 1.6));
         }
@@ -438,49 +481,93 @@ export function buildUnit(type: UnitType, side: Owner): { group: THREE.Group; sp
       break;
     }
     case 'mecha': {
-      // bípedo de abordaje: casco grafito, visor, hombreras del equipo, brazo cañón y brazo garra
+      // bípedo de abordaje: torso cápsula, cabeza con visor, hombreras redondas, brazo cañón y brazo garra
       g.add(at(hoverPad(m, 2), 0, -1.2, 0));
-      for (const x of [-0.6, 0.6]) {
-        const thigh = at(box(0.55, 1.2, 0.7, m.gunmetal), x, 0.1, 0);
-        thigh.rotation.x = -0.15;
+      for (const x of [-0.62, 0.62]) {
+        g.add(at(sphere(0.38, m.joint, 10, 8), x, 0.55, 0));
+        const thigh = at(capsule(0.3, 0.7, m.gunmetal), x, 0.05, 0.05);
+        thigh.rotation.x = -0.2;
         g.add(thigh);
-        g.add(at(box(0.6, 1, 0.6, m.gunmetal), x, -0.85, 0.15));
-        g.add(at(box(0.75, 0.25, 1.1, m.trim), x, -1.35, 0.3));
+        g.add(at(sphere(0.3, m.joint, 10, 8), x, -0.45, 0.12));
+        g.add(at(capsule(0.28, 0.55, m.hull), x, -0.85, 0.12));
+        g.add(at(box(0.62, 0.22, 1, m.trim), x, -1.3, 0.28));
       }
-      g.add(at(box(2, 1.6, 1.4, m.gunmetal), 0, 1.4, 0));
-      g.add(at(box(1.6, 0.7, 0.2, m.trim), 0, 1.3, 0.72));
-      g.add(at(box(1, 0.7, 0.9, m.gunmetal), 0, 2.5, 0.1));
-      g.add(at(box(0.8, 0.18, 0.05, m.glow), 0, 2.55, 0.57));
-      for (const x of [-1.3, 1.3]) g.add(at(box(0.9, 0.5, 1.2, m.trim), x, 2.15, 0));
-      // brazo derecho: cañón; izquierdo: garra
-      const gun = cyl(0.22, 0.22, 2, m.dark, 8);
+      // torso: cápsula horizontal con peto del equipo y núcleo brillante
+      const torso = at(capsule(0.85, 0.5, m.hull), 0, 1.4, 0);
+      torso.rotation.z = Math.PI / 2;
+      g.add(torso);
+      g.add(at(box(1.3, 0.75, 0.25, m.trim), 0, 1.35, 0.78));
+      g.add(at(sphere(0.22, m.glow, 10, 8), 0, 1.4, 0.92));
+      // cabeza: domo con visor en franja
+      g.add(at(sphere(0.55, m.hull, 14, 10), 0, 2.45, 0.05));
+      const visor = at(torus(0.42, 0.09, m.glow, 20), 0, 2.48, 0.12);
+      visor.scale.set(1, 0.45, 1);
+      visor.rotation.x = Math.PI / 2;
+      g.add(visor);
+      // hombreras: medias esferas del equipo
+      for (const x of [-1.25, 1.25]) {
+        const pad = at(new THREE.Mesh(new THREE.SphereGeometry(0.62, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.trim), x, 1.9, 0);
+        pad.scale.set(1, 0.8, 1.1);
+        g.add(pad);
+        g.add(at(sphere(0.32, m.joint, 10, 8), x, 1.75, 0));
+      }
+      // brazo derecho: cañón con boca brillante; izquierdo: garra de abordaje
+      g.add(at(capsule(0.26, 0.7, m.gunmetal), 1.35, 1.2, 0.15));
+      const gun = cyl(0.24, 0.3, 1.9, m.plating, 10);
       gun.rotation.x = Math.PI / 2;
-      g.add(at(box(0.5, 1.3, 0.5, m.gunmetal), 1.35, 1.2, 0.2));
-      g.add(at(gun, 1.35, 0.6, 1));
-      g.add(at(box(0.5, 1.3, 0.5, m.gunmetal), -1.35, 1.2, 0.2));
-      g.add(at(box(0.7, 0.5, 0.8, m.trim), -1.35, 0.45, 0.5));
+      g.add(at(gun, 1.35, 0.7, 0.95));
+      g.add(at(sphere(0.17, m.glow, 8, 6), 1.35, 0.7, 1.92));
+      g.add(at(capsule(0.26, 0.7, m.gunmetal), -1.35, 1.2, 0.15));
+      for (const dx of [-0.2, 0.2]) {
+        const claw = at(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.8, 6), m.trim), -1.35 + dx, 0.5, 0.75);
+        claw.rotation.x = Math.PI / 2 + 0.4;
+        g.add(claw);
+      }
+      // mochila con dos toberas
+      g.add(at(capsule(0.4, 0.5, m.plating), 0, 1.55, -0.8));
+      for (const x of [-0.3, 0.3]) engine(x, 1.1, -1.1, 0.2);
       break;
     }
     case 'titan': {
-      // robot colosal: torso ancho, reactor en la espalda, puños de demolición y núcleo brillante
+      // robot colosal: torso abombado, reactor dorsal, hombros redondos, puños de demolición y núcleo Soroban
       g.add(at(hoverPad(m, 3.6), 0, -1.6, 0));
-      for (const x of [-1.2, 1.2]) {
-        g.add(at(box(1.2, 2.2, 1.4, m.gunmetal), x, -0.1, 0));
-        g.add(at(box(1.5, 0.5, 2.2, m.trim), x, -1.4, 0.3));
+      for (const x of [-1.25, 1.25]) {
+        g.add(at(sphere(0.75, m.joint, 12, 10), x, 0.9, 0));
+        g.add(at(capsule(0.62, 1.3, m.gunmetal), x, -0.2, 0.05));
+        g.add(at(box(1.5, 0.45, 2.1, m.trim), x, -1.45, 0.3));
       }
-      g.add(at(box(4.4, 2.2, 2.6, m.gunmetal), 0, 2.2, 0));
-      g.add(at(box(3.6, 1.4, 2.4, m.trim), 0, 4, 0));
-      g.add(at(sphere(0.8, m.glow, 12, 8), 0, 2.6, 1.3));
-      g.add(at(torus(0.95, 0.15, m.trim, 20), 0, 2.6, 1.32));
-      g.add(at(box(1.6, 1, 1.4, m.dark), 0, 5.3, 0.4));
-      g.add(at(box(1.2, 0.2, 0.05, m.glow), 0, 5.4, 1.12));
-      // reactor dorsal con dos toberas
-      g.add(at(cyl(0.9, 0.9, 2.4, m.dark, 10), 0, 3.6, -1.8));
-      for (const x of [-0.7, 0.7]) g.add(at(sphere(0.35, m.glow, 8, 6), x, 2.4, -2.2));
-      for (const x of [-2.9, 2.9]) {
-        g.add(at(box(1.6, 1.4, 1.8, m.trim), x, 4.2, 0));
-        g.add(at(box(1.2, 2.4, 1.2, m.gunmetal), x, 2.4, 0.2));
-        g.add(at(box(1.6, 1.6, 1.8, m.dark), x, 0.8, 0.5));
+      // torso: dos cápsulas superpuestas (cintura y pecho)
+      const waist = at(capsule(1.1, 1.1, m.plating), 0, 1.3, 0);
+      waist.rotation.z = Math.PI / 2;
+      g.add(waist);
+      const chest = at(capsule(1.5, 1.6, m.hull), 0, 3, 0);
+      chest.rotation.z = Math.PI / 2;
+      chest.scale.set(1, 1, 0.9);
+      g.add(chest);
+      g.add(at(box(2.6, 1.3, 0.3, m.trim), 0, 3.05, 1.3));
+      // núcleo Soroban: esfera brillante enmarcada por un anillo que gira
+      g.add(at(sphere(0.65, m.glow, 14, 10), 0, 3.05, 1.5));
+      const coreRing = at(torus(0.95, 0.12, m.glow, 24), 0, 3.05, 1.5);
+      g.add(coreRing);
+      spins.push({ obj: coreRing, axis: 'z', speed: 1.6 });
+      // cabeza baja con visor
+      g.add(at(sphere(0.85, m.hull, 14, 10), 0, 4.65, 0.35));
+      const visor = at(box(1.3, 0.22, 0.2, m.glow), 0, 4.7, 1.1);
+      g.add(visor);
+      // reactor dorsal
+      const reactor = at(cyl(0.95, 0.95, 2.6, m.plating, 14), 0, 3.4, -1.7);
+      g.add(reactor);
+      for (const y of [2.6, 3.4, 4.2]) g.add(flat(at(torus(0.98, 0.08, m.trim, 20), 0, y, -1.7)));
+      for (const x of [-0.6, 0.6]) engine(x, 2.2, -2.5, 0.35);
+      for (const x of [-2.95, 2.95]) {
+        const pad = at(new THREE.Mesh(new THREE.SphereGeometry(1.15, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), m.trim), x, 4, 0);
+        pad.scale.set(1, 0.75, 1.15);
+        g.add(pad);
+        g.add(at(sphere(0.6, m.joint, 10, 8), x, 3.7, 0));
+        g.add(at(capsule(0.55, 1.1, m.gunmetal), x, 2.4, 0.15));
+        // puño de demolición con nudillos brillantes
+        g.add(at(box(1.5, 1.4, 1.6, m.plating), x, 0.9, 0.45));
+        for (const dx of [-0.42, 0, 0.42]) g.add(at(box(0.28, 0.28, 0.2, m.glow), x + dx, 1.25, 1.28));
       }
       break;
     }
