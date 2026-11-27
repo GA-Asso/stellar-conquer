@@ -90,9 +90,9 @@ export class Hud {
         <div class="clock" id="clock"></div>
       </div>
       <div class="bottom">
-        <div class="minimap"><canvas width="220" height="220"></canvas></div>
-        <div class="selection" id="sel"></div>
-        <div class="commands" id="cmds"></div>
+        <div class="dock minimap"><header>Mapa<span id="mini-coords"></span></header><canvas width="400" height="400" title="Clic: mover la cámara · clic derecho: enviar la selección"></canvas></div>
+        <div class="dock selection"><header id="sel-head">Selección</header><div class="sel-body" id="sel"></div></div>
+        <div class="dock orders"><header>Órdenes<span>atajo de teclado en la esquina</span></header><div class="commands" id="cmds"></div></div>
       </div>
       <details class="help"><summary>Controles</summary>
         <dl>
@@ -238,7 +238,7 @@ export class Hud {
     const sel = this.selection(s);
     let html = '';
     if (sel.length === 0) {
-      html = `<div class="empty"><b>Nada seleccionado.</b><br>Arrastra un recuadro sobre tus drones (cian) o haz clic en un módulo de tu estación para ver qué puede hacer.</div>`;
+      html = `<div class="empty"><b>Nada seleccionado</b>Arrastra un recuadro sobre tus drones (cian) o haz clic en un módulo de tu estación para ver qué puede hacer.</div>`;
     } else if (sel.length === 1) {
       const e = sel[0];
       if (e.kind === 'unit') {
@@ -250,22 +250,30 @@ export class Hud {
           : UNITS[e.type].cls === 'robot' ? 'Clic derecho sobre un planeta para conquistarlo, o sobre un enemigo para atacarlo.'
           : 'Clic derecho sobre un enemigo para atacar · Ctrl+clic derecho para avanzar atacando.';
         html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, `
-          <div class="stats"><span>Ataque ${d.damage}</span><span>Alcance ${d.range}</span><span>Velocidad ${d.speed}</span><span>${task}</span></div>`, hint);
+          <div class="stats"><span>ATQ<b>${d.damage}</b></span><span>ALC<b>${d.range}</b></span><span>VEL<b>${d.speed}</b></span><span class="task">${task}</span></div>`, hint, UNIT_GLYPH[e.type]);
       } else if (e.kind === 'module') {
         const d = MODULES[e.type];
         let extra = '';
         if (e.built < 1) extra = `<div class="progress"><i style="width:${e.built * 100}%"></i><span>Ensamblaje ${Math.floor(e.built * 100)} %</span></div>`;
         else if (e.queue.length) {
           const q = e.queue[0];
-          extra = `<div class="queue">${e.queue.map((q, i) => `<span class="${i === 0 ? 'now' : ''}">${q.item === 'era' ? 'Era' : UNITS[q.item].name}</span>`).join('')}</div>
-          <div class="progress"><i style="width:${(q.progress / q.total) * 100}%"></i><span>${Math.ceil(q.total - q.progress)} s</span></div>`;
+          // cola en casillas: la primera se rellena con el progreso, el resto espera; 6 huecos como el límite
+          const slots = Array.from({ length: 6 }, (_, i) => {
+            const it = e.queue[i];
+            if (!it) return '<span class="slot"></span>';
+            const g = it.item === 'era' ? '⬆' : UNIT_GLYPH[it.item];
+            const name = it.item === 'era' ? 'Avance de era' : UNITS[it.item].name;
+            return `<span class="slot full${i === 0 ? ' now' : ''}" title="${name}">${i === 0 ? `<i style="height:${(it.progress / it.total) * 100}%"></i>` : ''}<b>${g}</b></span>`;
+          }).join('');
+          const nowName = q.item === 'era' ? 'Avance de era' : UNITS[q.item].name;
+          extra = `<div class="queue">${slots}<div class="q-now"><span>${nowName}</span><b>${Math.ceil(q.total - q.progress)} s</b></div></div>`;
         }
         if (e.type === 'beacon' && e.built >= 1) extra += `<div class="stats"><span>Quórum: ${s.players[e.side].beaconLedgers}/30 ledgers</span></div>`;
         const hint = e.side !== this.side ? 'Módulo enemigo: los robots le hacen el doble de daño.'
           : e.built < 1 ? 'En ensamblaje: selecciona drones y haz clic derecho aquí para acelerarlo.'
           : MODULES[e.type].trains.length ? 'Pulsa un botón de la derecha para fabricar. Clic derecho en el mapa fija el punto de reunión de lo que salga.'
           : e.type === 'lab' ? 'Ya puedes avanzar de era: selecciona el Núcleo y pulsa «Avanzar».' : MODULE_HELP[e.type];
-        html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, extra, hint);
+        html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, extra, hint, MODULE_GLYPH[e.type]);
       } else if (e.kind === 'asteroid') {
         html = this.card(DEPOSITS[e.res].name, `Quedan ${Math.floor(e.amount)} unidades.`, 0, 0, -1, '',
           'Selecciona drones y haz clic derecho sobre él para minarlo.');
@@ -278,16 +286,23 @@ export class Hud {
       const counts = new Map<string, number>();
       for (const e of sel) if (e.kind === 'unit') counts.set(UNITS[e.type].name, (counts.get(UNITS[e.type].name) ?? 0) + 1);
       html = `<div class="multi">${[...counts].map(([n, c]) => `<span><b>${c}</b> ${n}</span>`).join('')}</div>
-        <div class="hint">${sel.every(e => e.kind === 'unit' && e.type === 'drone')
+        <div class="hint"><i>i</i>${sel.every(e => e.kind === 'unit' && e.type === 'drone')
           ? 'Clic derecho en un asteroide para minar · elige un módulo a la derecha y colócalo en un hexágono verde para construir.'
           : 'Clic derecho: mover o atacar · Ctrl+clic derecho: avanzar atacando · Ctrl+1…9: guardar este grupo.'}</div>`;
     }
     if (this.el.sel.innerHTML !== html) this.el.sel.innerHTML = html;
+    const head = sel.length > 1 ? `Selección<span>${sel.length} unidades</span>` : 'Selección';
+    const h = this.root.querySelector<HTMLElement>('#sel-head')!;
+    if (h.innerHTML !== head) h.innerHTML = head;
   }
 
-  private card(name: string, desc: string, hp: number, max: number, side: number, extra: string, hint = '') {
-    const hpBar = max > 0 ? `<div class="hp"><i style="width:${(hp / max) * 100}%"></i><span>${Math.ceil(hp)} / ${max}</span></div>` : '';
-    return `<div class="card side-${side}"><h3>${name}</h3><p>${desc}</p>${hpBar}${extra}${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+  private card(name: string, desc: string, hp: number, max: number, side: number, extra: string, hint = '', glyph = '') {
+    const k = max > 0 ? hp / max : 1;
+    const hpBar = max > 0 ? `<div class="hp ${k > 0.6 ? '' : k > 0.3 ? 'mid' : 'low'}"><i style="width:${k * 100}%"></i></div><div class="hp-num"><span>Integridad</span><b>${Math.ceil(hp)} / ${max}</b></div>` : '';
+    const tag = side === this.side ? 'Tuyo' : side === -1 ? 'Neutral' : 'Rival';
+    return `<div class="card side-${side === this.side ? 0 : side === -1 ? -1 : 1}">
+      <div class="card-id">${glyph ? `<i class="card-g">${glyph}</i>` : ''}<div><h3>${name}</h3><p>${desc}</p></div><span class="card-tag">${tag}</span></div>
+      ${hpBar}${extra}${hint ? `<div class="hint"><i>i</i>${hint}</div>` : ''}</div>`;
   }
 
   private updateButtons(s: SimState) {
@@ -344,7 +359,7 @@ export class Hud {
     this.buttonsKey = key;
     this.el.cmds.innerHTML = buttons.map((b, i) => `
       <button data-i="${i}" class="${b.enabled ? '' : 'off'} ${b.key === this.highlight ? 'hl' : ''}">
-        <kbd>${b.key === 'Backspace' ? '⌫' : b.key}</kbd>${b.glyph ? `<i class="g">${b.glyph}</i>` : ''}<b>${b.label}</b><small>${b.sub}</small>${b.why ? `<em>${b.why}</em>` : ''}
+        <kbd>${b.key === 'Backspace' ? '⌫' : b.key}</kbd><span class="c-top">${b.glyph ? `<i class="g">${b.glyph}</i>` : ''}<b>${b.label}</b></span><small>${b.sub}</small>${b.why ? `<em>${b.why}</em>` : ''}
       </button>`).join('');
   }
 
@@ -401,32 +416,79 @@ export class Hud {
   }
 
   private drawMinimap(s: SimState) {
-    const c = this.mctx, W = this.mini.width;
-    c.fillStyle = '#05060d';
+    // el lienzo es de 400 px y se muestra a ~200: todo se dibuja a doble resolución para que sea nítido
+    const c = this.mctx, W = this.mini.width, k = W / (MAP_HALF * 2);
+    c.fillStyle = '#060811';
     c.fillRect(0, 0, W, W);
-    const col = (side: number) => side === 0 ? '#2ee6ff' : side === 1 ? '#ff3d8b' : '#9aa3c7';
+    // cuadrícula táctica y anillos de radar desde el centro
+    c.strokeStyle = 'rgba(120,140,190,0.09)';
+    c.lineWidth = 1;
+    c.beginPath();
+    for (let i = 1; i < 8; i++) { const v = Math.round((i / 8) * W) + 0.5; c.moveTo(v, 0); c.lineTo(v, W); c.moveTo(0, v); c.lineTo(W, v); }
+    c.stroke();
+    c.strokeStyle = 'rgba(120,140,190,0.12)';
+    for (const r of [0.18, 0.34]) { c.beginPath(); c.arc(W / 2, W / 2, r * W, 0, Math.PI * 2); c.stroke(); }
+    // barrido del radar
+    const sweep = (performance.now() / 2600) % 1 * Math.PI * 2;
+    const grad = c.createConicGradient(sweep, W / 2, W / 2);
+    grad.addColorStop(0, 'rgba(46,230,255,0.10)');
+    grad.addColorStop(0.08, 'rgba(46,230,255,0)');
+    grad.addColorStop(1, 'rgba(46,230,255,0)');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, W, W);
+
+    const col = (side: number) => side === this.side ? '#2ee6ff' : side === -1 ? '#9aa3c7' : '#ff3d8b';
+    // primero planetas y recursos (fondo), luego módulos y unidades (encima)
     for (const e of s.entities.values()) {
       const p = this.toMini(e.pos.x, e.pos.z);
-      if (e.kind === 'asteroid') { c.fillStyle = DEPOSITS[e.res].color; c.fillRect(p.x - 1, p.y - 1, 2, 2); }
-      else if (e.kind === 'planet') {
-        c.beginPath(); c.arc(p.x, p.y, e.radius * W / (MAP_HALF * 2), 0, Math.PI * 2);
-        c.fillStyle = e.owner === -1 ? '#3a3f5c' : col(e.owner); c.globalAlpha = 0.6; c.fill(); c.globalAlpha = 1;
-      } else if (e.kind === 'module') { c.fillStyle = col(e.side); c.fillRect(p.x - 2.5, p.y - 2.5, 5, 5); }
-      else { c.fillStyle = col(e.side); c.fillRect(p.x - 1.2, p.y - 1.2, 2.4, 2.4); }
+      if (e.kind === 'asteroid') {
+        c.fillStyle = DEPOSITS[e.res].color; c.globalAlpha = 0.55;
+        c.beginPath(); c.arc(p.x, p.y, 2.2, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+      } else if (e.kind === 'planet') {
+        const r = Math.max(6, e.radius * k);
+        c.beginPath(); c.arc(p.x, p.y, r, 0, Math.PI * 2);
+        c.fillStyle = e.owner === -1 ? 'rgba(90,98,140,0.35)' : e.owner === this.side ? 'rgba(46,230,255,0.22)' : 'rgba(255,61,139,0.22)';
+        c.fill();
+        c.strokeStyle = e.owner === -1 ? 'rgba(154,163,199,0.6)' : col(e.owner);
+        c.lineWidth = 1.5; c.stroke();
+        // arco de captura en curso
+        if (e.capture && Math.abs(e.capture) < 1) {
+          c.beginPath(); c.arc(p.x, p.y, r + 3, -Math.PI / 2, -Math.PI / 2 + Math.abs(e.capture) * Math.PI * 2);
+          c.strokeStyle = e.capture >= 0 ? '#2ee6ff' : '#ff3d8b'; c.lineWidth = 2; c.stroke();
+        }
+      }
     }
-    // vista de la cámara: un rombo según el giro
+    for (const e of s.entities.values()) {
+      if (e.kind !== 'module' && e.kind !== 'unit') continue;
+      const p = this.toMini(e.pos.x, e.pos.z);
+      c.fillStyle = col(e.side);
+      if (e.kind === 'module') {
+        const r = e.type === 'core' ? 7 : 4.5;
+        c.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+        c.strokeStyle = 'rgba(5,6,12,0.9)'; c.lineWidth = 1.5; c.strokeRect(p.x - r, p.y - r, r * 2, r * 2);
+      } else {
+        const r = UNITS[e.type].cls === 'robot' ? 3.2 : e.type === 'drone' ? 2 : 2.6;
+        c.beginPath(); c.arc(p.x, p.y, r, 0, Math.PI * 2); c.fill();
+        if (this.input.ui.selected.has(e.id)) { c.strokeStyle = '#ffffff'; c.lineWidth = 1.2; c.stroke(); }
+      }
+    }
+    // vista de la cámara: trapecio según el giro
     const rig = this.space.rig;
     const t = this.toMini(rig.target.x, rig.target.z);
-    const r = rig.distance * 0.45 * W / (MAP_HALF * 2);
+    const r = rig.distance * 0.45 * k;
     c.save();
     c.translate(t.x, t.y);
     c.rotate(-rig.yaw);
-    c.strokeStyle = 'rgba(255,255,255,0.7)';
-    c.lineWidth = 1;
+    c.strokeStyle = 'rgba(253,218,36,0.85)';
+    c.fillStyle = 'rgba(253,218,36,0.05)';
+    c.lineWidth = 1.5;
     c.beginPath();
     c.moveTo(-r * 0.6, -r * 0.5); c.lineTo(r * 0.6, -r * 0.5); c.lineTo(r, r * 0.5); c.lineTo(-r, r * 0.5); c.closePath();
-    c.stroke();
+    c.fill(); c.stroke();
     c.restore();
+    const coords = `${Math.round(rig.target.x)}, ${Math.round(rig.target.z)}`;
+    const ce = this.root.querySelector<HTMLElement>('#mini-coords');
+    if (ce && ce.textContent !== coords) ce.textContent = coords;
   }
 
   // ---------- capa 2D sobre el 3D: barras de vida, recuadro y marcador de orden ----------
