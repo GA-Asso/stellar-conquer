@@ -566,9 +566,9 @@ export class Trail {
     this.points = new THREE.Points(geo, new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       vertexShader: `attribute float aFade; varying float vF;
-        void main(){ vF = aFade; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = (2.0 + 9.0 * aFade) * 260.0 / -mv.z; gl_Position = projectionMatrix * mv; }`,
+        void main(){ vF = aFade; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = (1.5 + 5.5 * aFade) * 260.0 / -mv.z; gl_Position = projectionMatrix * mv; }`,
       fragmentShader: `varying float vF;
-        void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, r) * vF * vF; gl_FragColor = vec4(vec3(0.5, 1.6, 2.4) * a, a); }`,
+        void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, r) * vF * vF; gl_FragColor = vec4(vec3(0.3, 0.9, 1.4) * a, a); }`,
     }));
     this.points.frustumCulled = false;
   }
@@ -611,4 +611,121 @@ export function starGlow(stars: { x: number; z: number; size: number }[], colors
   });
   const points = new THREE.Points(geo, mat);
   return { points, tick: t => { mat.uniforms.uTime.value = t; } };
+}
+
+// ---------- nave del jugador ----------
+
+export interface Flagship {
+  group: THREE.Group;
+  /** posición local de las toberas, para que la estela nazca detrás y no tape el casco */
+  tail: THREE.Vector3;
+  /** tiñe las franjas de acento con el color de la skin equipada (null = dorado de serie) */
+  setAccent(color: string | null): void;
+  tick(t: number, speed01: number): void;
+}
+
+/**
+ * Nave insignia del piloto: fuselaje torneado y achatado, cabina de cristal, alas en flecha con
+ * winglets, dos góndolas de motor con toberas y luces de navegación. Metal con barniz (clearcoat) para
+ * que refleje el entorno; lo único que emite luz son las toberas, a una intensidad contenida.
+ * Mira hacia +z y mide unas 10 unidades de largo.
+ */
+export function buildFlagship(): Flagship {
+  const g = new THREE.Group();
+  const hull = new THREE.MeshPhysicalMaterial({ color: 0xc9d0dc, metalness: 0.75, roughness: 0.3, clearcoat: 0.7, clearcoatRoughness: 0.18 });
+  const graphite = new THREE.MeshPhysicalMaterial({ color: 0x262b3a, metalness: 0.8, roughness: 0.42, clearcoat: 0.3 });
+  const accentBase = new THREE.Color(0xd4a92a);
+  const accent = new THREE.MeshPhysicalMaterial({ color: accentBase.clone(), metalness: 1, roughness: 0.28, clearcoat: 0.5 });
+  const canopy = new THREE.MeshPhysicalMaterial({ color: 0x0a0f1e, metalness: 0.1, roughness: 0.04, clearcoat: 1, emissive: 0x0b2440, emissiveIntensity: 0.5 });
+  const nozzleGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 1.15, 1.6) });
+  const plumeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 0.7, 1.1), transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false });
+
+  // fuselaje: perfil torneado (radio por posición a lo largo del eje), achatado para dar sección de ala
+  const profile = [[0, 5.4], [0.22, 5.0], [0.5, 4.2], [0.78, 3.0], [0.95, 1.4], [1.0, 0], [0.96, -1.6], [0.86, -3.0], [0.7, -4.0], [0.0, -4.0]]
+    .map(([r, z]) => new THREE.Vector2(r, z));
+  const fus = new THREE.Mesh(new THREE.LatheGeometry(profile, 28), hull);
+  fus.rotation.x = Math.PI / 2;
+  fus.scale.set(1.15, 1, 0.68); // tras rotar: x ancho, z (local y del torno) alto
+  g.add(fus);
+  // quilla oscura bajo el casco y líneas de panel
+  const keel = at(box(0.9, 0.18, 6.4, graphite), 0, -0.62, -0.2);
+  g.add(keel);
+  g.add(at(box(1.8, 0.03, 0.04, graphite), 0, 0.68, 0.4));
+  // franja de acento dorsal
+  g.add(at(box(0.16, 0.05, 3.0, accent), 0, 0.68, -0.1));
+
+  // cabina
+  const cab = at(sph(1, canopy, 24, 16), 0, 0.5, 2.3);
+  cab.scale.set(0.46, 0.34, 1.25);
+  g.add(cab);
+  const frame = at(tor(0.47, 0.035, graphite, 32), 0, 0.5, 2.3);
+  frame.scale.set(1, 0.74, 1);
+  g.add(frame);
+
+  // alas en flecha extruidas con bisel, winglets y franja de acento en el borde de ataque
+  const wingShape = new THREE.Shape();
+  wingShape.moveTo(0, 1.6); wingShape.lineTo(4.6, -1.4); wingShape.lineTo(4.6, -2.3); wingShape.lineTo(0, -2.0); wingShape.closePath();
+  const wingGeo = new THREE.ExtrudeGeometry(wingShape, { depth: 0.14, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.05, bevelSegments: 2 });
+  wingGeo.rotateX(Math.PI / 2); // plano XZ, con +y del shape hacia +z (morro)
+  const lights: { o: THREE.Object3D; p: number }[] = [];
+  for (const s of [-1, 1]) {
+    const w = new THREE.Mesh(wingGeo, hull);
+    w.scale.x = s;
+    w.position.set(s * 0.7, -0.05, -0.6);
+    g.add(w);
+    // franja sobre el borde de ataque: de (0, 1.6) a (4.6, -1.4) en el plano del ala
+    const edge = at(box(0.1, 0.05, 5.3, accent), s * 3.0, 0.11, -0.5);
+    edge.rotation.y = Math.atan2(s * 4.6, -3.0);
+    g.add(edge);
+    const tip = at(box(0.1, 0.9, 1.0, graphite), s * 5.3, 0.38, -2.4);
+    tip.rotation.z = -s * 0.25;
+    g.add(tip);
+    // luz de navegación: roja a babor (izquierda, x>0 mirando a +z) y verde a estribor
+    const nav = sph(0.09, new THREE.MeshBasicMaterial({ color: s > 0 ? new THREE.Color(2.2, 0.3, 0.25) : new THREE.Color(0.3, 2.0, 0.6) }), 8, 6);
+    g.add(at(nav, s * 5.32, 0.05, -1.9));
+    lights.push({ o: nav, p: s > 0 ? 0 : 0.5 });
+
+    // góndola de motor con toma, anillo de tobera y núcleo
+    const nac = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 3.4, 20), graphite);
+    nac.rotation.x = Math.PI / 2;
+    g.add(at(nac, s * 1.45, -0.05, -2.5));
+    const intake = at(tor(0.5, 0.06, hull, 24), s * 1.45, -0.05, -0.8);
+    g.add(intake);
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.5, 20, 1, true), hull);
+    nozzle.rotation.x = Math.PI / 2;
+    g.add(at(nozzle, s * 1.45, -0.05, -4.4));
+    const core = new THREE.Mesh(new THREE.CircleGeometry(0.36, 20), nozzleGlow);
+    core.rotation.y = Math.PI;
+    g.add(at(core, s * 1.45, -0.05, -4.3));
+    const plume = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1, 16, 1, true), plumeMat);
+    plume.rotation.x = -Math.PI / 2;
+    plume.geometry.translate(0, 0.5, 0); // base en la tobera, punta hacia atrás
+    plume.position.set(s * 1.45, -0.05, -4.4);
+    g.add(plume);
+    lights.push({ o: plume, p: -1 });
+  }
+  // deriva dorsal
+  const finShape = new THREE.Shape();
+  finShape.moveTo(0, 0); finShape.lineTo(-1.9, 0); finShape.lineTo(-2.4, 1.15); finShape.lineTo(-1.7, 1.15); finShape.closePath();
+  const fin = new THREE.Mesh(new THREE.ExtrudeGeometry(finShape, { depth: 0.1, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 1 }), hull);
+  fin.rotation.y = -Math.PI / 2;
+  fin.position.set(0.05, 0.55, -1.2);
+  g.add(fin);
+  const beacon = sph(0.08, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.4) }), 8, 6);
+  g.add(at(beacon, 0, 1.72, -3.55));
+  lights.push({ o: beacon, p: 0.25 });
+
+  const plumes = lights.filter(l => l.p === -1).map(l => l.o);
+  const navs = lights.filter(l => l.p >= 0);
+  return {
+    group: g,
+    tail: new THREE.Vector3(0, -0.05, -4.8),
+    setAccent(color) { accent.color.copy(color ? new THREE.Color(color) : accentBase); },
+    tick(t, speed01) {
+      for (const l of navs) l.o.visible = ((t * 1.1 + l.p) % 1) < 0.18;
+      const len = 0.6 + speed01 * 3.2 + Math.sin(t * 40) * 0.08;
+      for (const p of plumes) p.scale.set(1, len, 1);
+      plumeMat.opacity = 0.18 + speed01 * 0.22;
+    },
+  };
 }

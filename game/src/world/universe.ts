@@ -2,14 +2,13 @@
 // se descubren al acercarse y la nave del jugador, que vuela con WASD o con clic (piloto automático).
 import * as THREE from 'three';
 import type { SpaceScene } from '../render/scene';
-import { buildUnit } from '../render/models';
 import { itemDef, type WorldState } from './economy';
 import { CURATED_INNER, CURATED_SLUGS, GALAXIES, NODES, galaxyOf, nodeSlug, nodeWorldPos, type Galaxy, type WorldNode } from './ecosystem';
 import { STATUS_INFO, layoutAtlas, type RavenSnapshot, type Star } from './atlas';
 
 /** color de los astros cuya web oficial no responde */
 const LOST = '#5d6275';
-import { Scenery, Trail, buildStructure, starGlow } from './spacecraft';
+import { Scenery, Trail, buildFlagship, buildStructure, starGlow, type Flagship } from './spacecraft';
 
 const SHIP_SPEED = 170;
 const ARRIVE = 22;
@@ -83,6 +82,8 @@ function buildGalaxy(g: Galaxy): THREE.Group {
 export class Universe {
   private root = new THREE.Group();
   private ship: THREE.Group;
+  private flagship: Flagship;
+  private tailWorld = new THREE.Vector3();
   private shipVel = new THREE.Vector3();
   private autopilot: THREE.Vector3 | null = null;
   private nodes: NodeView[] = [];
@@ -155,14 +156,14 @@ export class Universe {
       this.nearLabels.push(el);
     }
 
-    const built = buildUnit('interceptor', 0);
-    this.ship = built.group;
-    this.ship.scale.setScalar(2.4);
+    this.flagship = buildFlagship();
+    this.ship = this.flagship.group;
+    this.ship.scale.setScalar(1.25);
     this.ship.position.set(0, 4, 90);
     this.root.add(this.ship);
-    // luz del motor: ilumina las estaciones y los astros al pasar cerca
-    const engine = new THREE.PointLight(0x7fe6ff, 900, 80, 2);
-    engine.position.set(0, 1.5, -2);
+    // luz del motor, detrás de las toberas: ilumina lo que dejas atrás sin quemar el casco
+    const engine = new THREE.PointLight(0x7fe6ff, 140, 60, 2);
+    engine.position.set(0, 0, -9);
     this.ship.add(engine);
     this.trail.reset(this.ship.position);
     this.root.add(this.trail.points);
@@ -265,12 +266,7 @@ export class Universe {
       v.label.classList.toggle('found', found);
     }
     const skin = this.world.skin ? itemDef(this.world.skin).color : null;
-    this.ship.traverse(o => {
-      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
-      if (!m || !('emissive' in m)) return;
-      if (!o.userData.baseEmissive) o.userData.baseEmissive = m.emissive.clone();
-      m.emissive.copy(skin ? new THREE.Color(skin) : o.userData.baseEmissive);
-    });
+    this.flagship.setAccent(skin ?? null);
   }
 
   /** salta directamente a un nodo (pruebas y atajos) */
@@ -404,7 +400,8 @@ export class Universe {
     for (const v of this.nodes) v.tick(this.t);
     this.scenery.update(dt, this.t);
     this.glowTick?.(this.t);
-    this.trail.update(dt, this.ship.position, this.shipVel.length());
+    this.flagship.tick(this.t, Math.min(1, this.shipVel.length() / SHIP_SPEED));
+    this.trail.update(dt, this.ship.localToWorld(this.tailWorld.copy(this.flagship.tail)), this.shipVel.length());
     // sensación de velocidad: el campo de visión se abre y los bordes se oscurecen al acelerar
     const k = THREE.MathUtils.smoothstep(this.shipVel.length() / SHIP_SPEED, 0.45, 1);
     this.warp += (k - this.warp) * Math.min(1, dt * 3);
