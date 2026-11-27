@@ -8,6 +8,7 @@ import { Fx } from './fx';
 import { iconSprite, MODULE_GLYPH } from './icons';
 import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, unitShadow, type Spin } from './models';
 import type { SpaceScene } from './scene';
+import { Scenery } from './scenery';
 
 const CARGO_COLORS: Record<AsteroidKind, THREE.Color> = {
   lumen: new THREE.Color(2.2, 1.8, 0.3),
@@ -43,6 +44,7 @@ export function altitude(e: Entity, t = 0, phase = 0): number {
 
 export class GameView {
   readonly fx: Fx;
+  private scenery: Scenery;
   private views = new Map<number, View>();
   private connectors = new Map<number, THREE.Group>();
   private prev = new Map<number, Vec>();
@@ -56,6 +58,7 @@ export class GameView {
 
   constructor(private space: SpaceScene, private local: Side) {
     this.fx = new Fx(space.scene);
+    this.scenery = new Scenery(space.scene);
     const hexRing = new THREE.RingGeometry(7.2, 8.4, 6).rotateX(-Math.PI / 2).rotateY(Math.PI / 6);
     this.ports = new THREE.InstancedMesh(hexRing, new THREE.MeshBasicMaterial({
       color: new THREE.Color(0.5, 2.2, 1.2), transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide,
@@ -97,6 +100,7 @@ export class GameView {
           break;
         }
         case 'ledger': {
+          this.scenery.onLedger();
           for (const side of [0, 1] as Side[]) {
             const core = coreOf(s, side);
             if (!core) continue;
@@ -168,6 +172,7 @@ export class GameView {
   sync(s: SimState, alpha: number, dt: number, selected: Set<number>) {
     this.time += dt;
     const t = this.time;
+    this.scenery.update(t, dt);
     const alive = new Set<number>();
     for (const e of s.entities.values()) {
       alive.add(e.id);
@@ -340,6 +345,7 @@ export class GameView {
     this.views.clear(); this.connectors.clear(); this.rings.clear();
     this.setGhost(null, null, false, []);
     this.space.scene.remove(this.ports);
+    this.scenery.dispose();
   }
 
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado
