@@ -6,7 +6,7 @@ import {
   visitProject, VISIT_XLM, type Asset, type Result, type Sector, type WorldState,
 } from './economy';
 import { DISCOVERABLE, galaxyOf, nodeSlug, type Galaxy, type WorldNode } from './ecosystem';
-import { STATUS_INFO, galaxyForProject, galaxyStats, projectUrl, usd, type RavenSnapshot, type Star } from './atlas';
+import { STATUS_INFO, galaxyForProject, galaxyStats, projectUrl, usd, type RavenProject, type RavenSnapshot, type Star } from './atlas';
 import { observatoryHtml, wireObservatory } from './observatory';
 
 const TYPE_ES: Record<string, string> = {
@@ -23,6 +23,32 @@ const PARTNER_ES: Record<string, string> = {
 };
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+const KIND_LABEL: Record<WorldNode['kind'], string> = {
+  info: 'Nodo', dex: 'Exchange', market: 'Mercado', trade: 'Puerto', frontier: 'Sector', atlas: 'Datos',
+};
+const day = (iso: string) => new Date(iso).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' });
+const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
+
+/** cabecera de ficha: ruta galaxia / tipo, título y una línea de acento del color de la galaxia */
+function cardHead(g: Galaxy, title: string, kind: string, code?: string): string {
+  return `<header class="u-ph" style="--g:${g.color}"><div class="u-crumb"><i></i>${esc(g.name)}<span>/ ${esc(kind)}</span>${code ? `<em>${esc(code)}</em>` : ''}</div><h2>${esc(title)}</h2></header>`;
+}
+
+/** hoja de datos: etiqueta a la izquierda, valor monoespaciado a la derecha */
+function spec(rows: [string, string, string?][]): string {
+  return `<dl class="u-spec">${rows.map(([k, v, cls]) => `<div><dt>${esc(k)}</dt><dd${cls ? ` class="${cls}"` : ''}>${v}</dd></div>`).join('')}</dl>`;
+}
+
+interface Source { label: string; url?: string | null; note?: string; state?: 'ok' | 'down' | 'ref' }
+/** lista de fuentes con su estado: la web oficial primero, el directorio al final */
+function sources(list: Source[], foot?: string): string {
+  const rows = list.filter(x => x.url).map(x => x.state === 'down'
+    ? `<div class="u-srcl down" title="La web no respondió al comprobarla"><i></i><span>${esc(x.label)}</span><small>${esc(x.note ?? 'sin respuesta')}</small></div>`
+    : `<a class="u-srcl ${x.state ?? 'ref'}" href="${esc(x.url!)}" target="_blank" rel="noopener"><i></i><span>${esc(x.label)}</span><small>${esc(x.note ?? host(x.url!))}</small><b>↗</b></a>`);
+  if (!rows.length) return '';
+  return `<section class="u-src"><h5>Fuentes</h5>${rows.join('')}${foot ? `<p>${foot}</p>` : ''}</section>`;
+}
+
 const DIFF_LABEL = { facil: 'Fácil', normal: 'Normal', dificil: 'Difícil' } as const;
 const DIFF_MULT = { facil: 1, normal: 2, dificil: 3 } as const;
 
@@ -71,7 +97,7 @@ export class WorldHud {
     if (atlas) {
       this.$('#u-legend').innerHTML = `<b>Cada estrella es un proyecto</b>${(['L', 'P', 'D'] as const).map(k =>
         `<span><i style="background:${STATUS_INFO[k].color}"></i>${STATUS_INFO[k].label}</span>`).join('')}
-        <span><i class="ring"></i>con auditoría</span><span><i class="dia"></i>socio</span><span class="u-legend-size">tamaño = financiación SCF + TVL</span>`;
+        <span><i style="background:#5d6275"></i>web caída</span><span><i class="ring"></i>con auditoría</span><span><i class="dia"></i>socio</span><span class="u-legend-size">tamaño = financiación SCF + TVL</span>`;
     } else this.$('#u-obs').style.display = 'none';
     this.$('#u-help').addEventListener('click', () => this.toggleHelp());
     this.$('#u-quick').addEventListener('click', () => this.ev.onQuickMatch());
@@ -167,8 +193,11 @@ export class WorldHud {
     if (!n && this.star && this.atlas) { this.renderStar(this.star); return; }
     if (!n) { this.panel.classList.remove('on'); this.panel.innerHTML = ''; return; }
     const g = galaxyOf(n.galaxy);
-    const head = `<div class="u-ph"><small style="color:${g.color}">${esc(g.name)}</small><h2>${esc(n.name)}</h2></div><p class="u-desc">${esc(n.desc)}</p>`;
-    const link = n.url ? `<a class="u-link" href="${esc(n.url)}" target="_blank" rel="noopener">Web oficial ↗</a>` : '';
+    const head = cardHead(g, n.name, KIND_LABEL[n.kind]) + `<p class="u-desc">${esc(n.desc)}</p>`;
+    const slug = nodeSlug(n.id);
+    const proj = slug ? this.atlas?.projects.find(x => x.s === slug) : undefined;
+    // los nodos que son proyectos del directorio listan sus fuentes en projectFacts; el resto, su enlace propio
+    const link = !proj && n.url ? sources([{ label: n.url.includes('developers.stellar.org') ? 'Documentación de Stellar' : 'Web oficial', url: n.url, state: 'ok' }]) : '';
     let body = '';
     if (n.kind === 'info') body = this.projectFacts(n) + this.infoBody(n);
     if (n.kind === 'dex') body = this.infoBody(n) + this.dexBody();
@@ -251,20 +280,51 @@ export class WorldHud {
     const slug = nodeSlug(n.id);
     const p = slug && this.atlas?.projects.find(x => x.s === slug);
     if (!p) return '';
+    return this.chips(p) + this.projectSpec(p) + this.projectSources(p, n.url);
+  }
+
+  private chips(p: RavenProject): string {
     const st = STATUS_INFO[p.st];
-    return `<div class="u-chips"><span class="u-status"><i style="background:${st.color}"></i>${st.label}</span>${p.t.map(t => `<span>${esc(TYPE_ES[t] ?? t)}</span>`).join('')}</div>
-      <div class="u-kv"><span>Financiación SCF</span><b>${p.scf ? usd(p.scf) : 'sin registro'}</b><span>TVL</span><b>${p.tvl ? usd(p.tvl) : '—'}</b>
-      <span>Auditorías</span><b>${p.au ? `${p.au.n} · ${esc(p.au.by.join(', '))}` : 'sin registro'}</b></div>
-      <a class="u-link" href="${projectUrl(p.s)}" target="_blank" rel="noopener">Ficha en Stellar Light ↗</a> `;
+    return `<div class="u-chips"><span class="u-status"><i style="background:${st.color}"></i>${st.label}</span>${p.t.map(t => `<span>${esc(TYPE_ES[t] ?? t)}</span>`).join('')}</div>`;
+  }
+
+  private projectSpec(p: RavenProject): string {
+    return spec([
+      ['Financiación SCF', p.scf ? usd(p.scf) : 'sin registro', p.scf ? '' : 'dim'],
+      ['TVL', p.tvl ? usd(p.tvl) : '—', p.tvl ? '' : 'dim'],
+      ['Auditorías', p.au ? `${p.au.n} · ${esc(p.au.by.join(', '))}` : 'sin registro', p.au ? '' : 'dim'],
+      ['Repositorios', p.r ? String(p.r) : '—', p.r ? '' : 'dim'],
+      ...(p.by ? [['Equipo', esc(p.by)] as [string, string]] : []),
+      ...(p.act ? [['Última actividad', day(p.act)] as [string, string]] : []),
+    ]);
+  }
+
+  /** fuentes de un proyecto: su web (si responde), su código, su cuenta de X, el SCF y por último el directorio */
+  private projectSources(p: RavenProject, curatedUrl?: string): string {
+    const web = p.web ?? curatedUrl ?? null;
+    const checked = this.atlas?.sitesCheckedAt;
+    return sources([
+      { label: 'Web oficial', url: web, state: p.down ? 'down' : 'ok', note: p.down ? `sin respuesta${checked ? ' · ' + day(checked) : ''}` : undefined },
+      { label: 'Código en GitHub', url: p.gh },
+      { label: 'Cuenta en X', url: p.x },
+      { label: 'Stellar Community Fund', url: p.scfUrl },
+      { label: 'Directorio Stellar Light', url: projectUrl(p.s), note: 'datos agregados' },
+    ], p.down ? 'La web oficial no respondió al generar los datos. Puede ser temporal; el código y las redes suelen seguir activos.' : undefined);
   }
 
   private atlasBody(): string {
     if (!this.atlas) return '<p class="u-note">No hay instantánea de datos. Genera una con <code>pnpm snapshot</code>.</p>';
     const t = this.atlas.totals;
-    return `<div class="u-kv"><span>Proyectos</span><b>${t.projects.toLocaleString('es')}</b><span>SCF</span><b>${usd(t.scfUSD)}</b>
-      <span>TVL</span><b>${usd(t.tvlUSD)}</b><span>Stablecoins</span><b>${t.stablecoins}</b></div>
-      <button class="u-cta big" id="u-open-obs">Abrir el Observatorio</button>
-      <p class="u-note">Atajo: tecla O desde cualquier punto del universo.</p>`;
+    const a = this.atlas;
+    return `<div class="u-metrics">
+        <div><span>Proyectos</span><b>${t.projects.toLocaleString('es')}</b></div>
+        <div><span>SCF repartido</span><b>${usd(t.scfUSD)}</b></div>
+        <div><span>TVL</span><b>${usd(t.tvlUSD)}</b></div>
+        <div><span>Stablecoins</span><b>${t.stablecoins}</b></div>
+      </div>
+      ${a.sitesDown != null ? spec([['Webs comprobadas', a.sitesCheckedAt ? day(a.sitesCheckedAt) : '—'], ['Sin respuesta', `${a.sitesDown} de ${a.projects.filter(p => p.web).length}`, a.sitesDown ? 'warn' : '']]) : ''}
+      <button class="u-cta big" id="u-open-obs"><span>Abrir el Observatorio</span><kbd>O</kbd></button>
+      <p class="u-meta">Instantánea del ${day(a.generatedAt)} · ${esc(a.source.name)} · licencia ${esc(a.source.license)}</p>`;
   }
 
   /** ficha de un astro del atlas: proyecto (datos de Raven) o socio */
@@ -274,31 +334,25 @@ export class WorldHud {
     let html: string;
     if (s.kind === 'partner') {
       const p = a.partners[s.index];
-      html = `<div class="u-ph"><small style="color:${g.color}">${esc(g.name)}</small><h2>${esc(p.n)}</h2></div>
+      html = `${cardHead(g, p.n, 'Socio')}
         <div class="u-chips"><span>${esc(PARTNER_ES[p.type] ?? p.type)}</span>${p.ramps.map(r => `<span>${esc(r)}</span>`).join('')}</div>
         <p class="u-desc">${esc(p.tag)}</p>
-        ${p.regions.length ? `<div class="u-kv"><span>Regiones</span><b>${esc(p.regions.join(', '))}</b></div>` : ''}
-        ${p.url ? `<a class="u-link" href="${esc(p.url)}" target="_blank" rel="noopener">Web oficial ↗</a>` : ''}`;
+        ${p.regions.length ? spec([['Regiones', esc(p.regions.join(', '))]]) : ''}
+        ${sources([{ label: 'Web oficial', url: p.url, state: 'ok' }])}`;
     } else {
       const p = a.projects[s.index];
-      const st = STATUS_INFO[p.st];
       const similar = a.projects
         .map((q, i) => ({ q, i }))
         .filter(({ q }) => q.s !== p.s && galaxyForProject(q) === s.galaxy && q.t.some(t => p.t.includes(t)))
         .sort((x, y) => ((y.q.scf ?? 0) + (y.q.tvl ?? 0)) - ((x.q.scf ?? 0) + (x.q.tvl ?? 0)))
         .slice(0, 4);
-      html = `<div class="u-ph"><small style="color:${g.color}">${esc(g.name)}</small><h2>${esc(p.n)}</h2></div>
-        <div class="u-chips"><span class="u-status"><i style="background:${st.color}"></i>${st.label}</span>${p.t.map(t => `<span>${esc(TYPE_ES[t] ?? t)}</span>`).join('')}</div>
+      html = `${cardHead(g, p.n, 'Proyecto')}
+        ${this.chips(p)}${p.down ? '<div class="u-alert"><i></i>Señal perdida: la web oficial no responde</div>' : ''}
         <p class="u-desc">${esc(p.d || 'Sin descripción en el directorio.')}</p>
-        <div class="u-kv">
-          <span>Financiación SCF</span><b>${p.scf ? usd(p.scf) : 'sin registro'}</b>
-          <span>TVL</span><b>${p.tvl ? usd(p.tvl) : '—'}</b>
-          <span>Auditorías</span><b>${p.au ? `${p.au.n} · ${esc(p.au.by.join(', '))}${p.au.at ? ` · última ${esc(p.au.at)}` : ''}` : 'sin registro'}</b>
-          <span>Repositorios</span><b>${p.r || '—'}</b>
-        </div>
-        <a class="u-link" href="${projectUrl(p.s)}" target="_blank" rel="noopener">Ficha completa en Stellar Light ↗</a>
-        ${similar.length ? `<h4 class="u-h4">Parecidos en esta galaxia</h4>${similar.map(({ q, i }) => `<button class="u-opt" data-star="${i}">${esc(q.n)}<small> · ${q.scf ? 'SCF ' + usd(q.scf) : STATUS_INFO[q.st].label}</small></button>`).join('')}` : ''}
-        <p class="u-note">"Sin registro" significa que la fuente no tiene el dato, no que no exista. Datos del ${new Date(a.generatedAt).toLocaleDateString('es')}.</p>`;
+        ${this.projectSpec(p)}
+        ${this.projectSources(p)}
+        ${similar.length ? `<h4 class="u-h4">Parecidos en esta galaxia</h4><div class="u-similar">${similar.map(({ q, i }) => `<button class="u-opt" data-star="${i}"><span>${esc(q.n)}</span><small>${q.scf ? 'SCF ' + usd(q.scf) : STATUS_INFO[q.st].label}</small></button>`).join('')}</div>` : ''}
+        <p class="u-meta">"Sin registro" significa que la fuente no tiene el dato, no que no exista. Datos del ${day(a.generatedAt)}.</p>`;
     }
     this.panel.innerHTML = html;
     this.panel.classList.add('on');

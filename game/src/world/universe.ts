@@ -6,6 +6,9 @@ import { buildUnit } from '../render/models';
 import { itemDef, type WorldState } from './economy';
 import { CURATED_INNER, CURATED_SLUGS, GALAXIES, NODES, galaxyOf, nodeSlug, nodeWorldPos, type Galaxy, type WorldNode } from './ecosystem';
 import { STATUS_INFO, layoutAtlas, type RavenSnapshot, type Star } from './atlas';
+
+/** color de los astros cuya web oficial no responde */
+const LOST = '#5d6275';
 import { Scenery, Trail, buildStructure, starGlow } from './spacecraft';
 
 const SHIP_SPEED = 170;
@@ -186,7 +189,8 @@ export class Universe {
         sc.setScalar(st.size);
         m.compose(pos, q, sc);
         mesh.setMatrixAt(i, m);
-        if (kind === 'project') col.set(STATUS_INFO[atlas.projects[st.index].st].color).multiplyScalar(1.35);
+        // los proyectos con la web caída se ven apagados: "señal perdida"
+        if (kind === 'project') col.set(atlas.projects[st.index].down ? LOST : STATUS_INFO[atlas.projects[st.index].st].color).multiplyScalar(atlas.projects[st.index].down ? 0.8 : 1.35);
         else col.set('#c9cbd6');
         mesh.setColorAt(i, col);
       });
@@ -200,7 +204,7 @@ export class Universe {
 
     // halo titilante de cada astro, del color de su estado
     const colors = this.stars.map(st => st.kind === 'project'
-      ? new THREE.Color(STATUS_INFO[atlas.projects[st.index].st].color)
+      ? new THREE.Color(atlas.projects[st.index].down ? LOST : STATUS_INFO[atlas.projects[st.index].st].color).multiplyScalar(atlas.projects[st.index].down ? 0.35 : 1)
       : new THREE.Color('#c9cbd6').multiplyScalar(0.7));
     const glow = starGlow(this.stars, colors);
     this.root.add(glow.points);
