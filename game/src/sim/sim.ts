@@ -666,38 +666,42 @@ function stepModule(s: SimState, m: Module) {
   }
 }
 
-// empuja unidades que se superponen entre sí y con obstáculos
-// capas de vuelo: los drones se cruzan con todo, las naves vuelan por encima de los robots
+// separación blanda: las unidades en marcha se atraviesan entre sí (nadie se traba en un pasillo), y las que
+// están quietas (en espera, disparando o minando) se reparten despacio para no quedar apiladas en un punto.
+// capas de vuelo: drones, naves y robots solo se apartan de los de su misma capa
 function layer(u: Unit): 0 | 1 | 2 {
   const cls = UNITS[u.type].cls;
   return cls === 'worker' ? 0 : cls === 'ship' ? 1 : 2;
 }
 
+// fracción de la suma de radios que dos unidades quietas mantienen entre sí
+const PERSONAL_SPACE = 0.8;
+// cuánto del solape se corrige por tick y tope del empujón, para que el reparto se vea como una deriva suave
+const SPREAD_RATE = 0.12;
+const SPREAD_MAX = 0.3;
+
 function separate(s: SimState) {
   const us = units(s);
-  for (let i = 0; i < us.length; i++) {
-    const a = us[i];
+  const still = us.filter(u => !moving.has(u.id));
+  for (let i = 0; i < still.length; i++) {
+    const a = still[i];
     const la = layer(a);
-    if (la === 0) continue;
     const ra = UNITS[a.type].radius;
-    for (let j = i + 1; j < us.length; j++) {
-      const b = us[j];
+    for (let j = i + 1; j < still.length; j++) {
+      const b = still[j];
       if (layer(b) !== la) continue;
       const rb = UNITS[b.type].radius;
       const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
-      const min = (ra + rb) * 0.9;
+      // los drones se arriman más: trabajan codo a codo en el mismo asteroide
+      const min = (ra + rb) * (la === 0 ? 0.55 : PERSONAL_SPACE);
       const d2 = dx * dx + dz * dz;
       if (d2 >= min * min) continue;
       const d = Math.sqrt(d2);
-      const nx = d > 1e-4 ? dx / d : Math.cos(a.id), nz = d > 1e-4 ? dz / d : Math.sin(a.id);
-      const overlap = min - d;
-      // quien está quieto le cede el paso a quien se mueve; dos quietos se acomodan despacio
-      const am = moving.has(a.id), bm = moving.has(b.id);
-      let ka = 0.5, kb = 0.5;
-      if (am && !bm) { ka = 0; kb = 1; } else if (bm && !am) { ka = 1; kb = 0; }
-      const push = Math.min(overlap * (am || bm ? 0.5 : 0.15), 0.6);
-      a.pos.x -= nx * push * ka; a.pos.z -= nz * push * ka;
-      b.pos.x += nx * push * kb; b.pos.z += nz * push * kb;
+      // dos unidades en el mismo punto exacto: se separan en una dirección fija según sus ids
+      const nx = d > 1e-4 ? dx / d : Math.cos(a.id * 2.4 + b.id), nz = d > 1e-4 ? dz / d : Math.sin(a.id * 2.4 + b.id);
+      const push = Math.min((min - d) * SPREAD_RATE, SPREAD_MAX) * 0.5;
+      a.pos.x -= nx * push; a.pos.z -= nz * push;
+      b.pos.x += nx * push; b.pos.z += nz * push;
     }
   }
   // las unidades vuelan por encima de la estación: solo asteroides y planetas estorban

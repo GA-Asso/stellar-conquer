@@ -51,4 +51,32 @@ describe('movimiento de grupo', () => {
     expect(r.reversals / r.samples).toBeLessThan(0.01);
     expect(r.idleDrift / r.samples).toBeLessThan(0.02);
   });
+
+  it('una columna atraviesa un grupo quieto sin frenarse', () => {
+    const s = createSim(7);
+    const wall = spawnGroup(s, 'mecha', 15);
+    const runners = spawnGroup(s, 'mecha', 3).map((id, i) => {
+      const u = s.entities.get(id) as Unit;
+      u.pos = { x: (s.entities.get(wall[7]) as Unit).pos.x - 30, z: (s.entities.get(wall[7]) as Unit).pos.z + i * 3 };
+      return id;
+    });
+    const goal = { x: (s.entities.get(wall[7]) as Unit).pos.x + 30, z: (s.entities.get(wall[7]) as Unit).pos.z };
+    step(s, [{ side: 0, cmd: { kind: 'move', units: runners, to: goal } }]);
+    // 60 de distancia a 11 u/s: con el paso libre llega en ~6 s
+    for (let t = 0; t < 7.5 * TICK_HZ; t++) step(s);
+    for (const id of runners) expect((s.entities.get(id) as Unit).order.kind).toBe('idle');
+  });
+
+  it('unidades apiladas en un punto se reparten solas', () => {
+    const s = createSim(8);
+    const ids = spawnGroup(s, 'interceptor', 10);
+    for (const id of ids) (s.entities.get(id) as Unit).pos = { x: 0, z: 60 };
+    for (let t = 0; t < 6 * TICK_HZ; t++) step(s);
+    const us = ids.map(id => s.entities.get(id) as Unit);
+    let minD = Infinity;
+    for (let i = 0; i < us.length; i++) for (let j = i + 1; j < us.length; j++) {
+      minD = Math.min(minD, Math.hypot(us[i].pos.x - us[j].pos.x, us[i].pos.z - us[j].pos.z));
+    }
+    expect(minD).toBeGreaterThan(2);
+  });
 });
