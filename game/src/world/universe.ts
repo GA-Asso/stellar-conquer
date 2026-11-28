@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { SpaceScene } from '../render/scene';
 import { itemDef, type WorldState } from './economy';
 import { CURATED_INNER, CURATED_SLUGS, GALAXIES, NODES, galaxyOf, nodeSlug, nodeWorldPos, type Galaxy, type WorldNode } from './ecosystem';
-import { STATUS_INFO, layoutAtlas, type RavenSnapshot, type Star } from './atlas';
+import { STATUS_INFO, constellationEdges, layoutAtlas, type RavenSnapshot, type Star } from './atlas';
 
 /** color de los astros cuya web oficial no responde */
 const LOST = '#5d6275';
@@ -83,6 +83,15 @@ function buildGalaxy(g: Galaxy): THREE.Group {
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 17;
   group.add(ring);
+  // banda ancha y tenue por dentro del borde: el territorio se ve como una zona, no solo como una línea
+  const band = new THREE.Mesh(
+    new THREE.RingGeometry(g.radius * 0.98, g.radius * 1.12, 96),
+    new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
+  );
+  band.rotation.x = -Math.PI / 2;
+  band.position.y = 17;
+  group.add(band);
+  group.userData.border = [ring.material, band.material];
   return group;
 }
 
@@ -108,6 +117,7 @@ export class Universe {
   private prevBound: number;
   private stars: Star[] = [];
   private planets: PlanetSpin[] = [];
+  private constellation: THREE.LineSegments | null = null;
   private starMeshes: { mesh: THREE.InstancedMesh; kind: Star['kind']; ids: number[] }[] = [];
   private nearLabels: HTMLDivElement[] = [];
   private hoverLabel: HTMLDivElement;
@@ -249,6 +259,24 @@ export class Universe {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       this.root.add(mesh);
       this.starMeshes.push({ mesh, kind: 'partner', ids: partners.map(s => this.stars.indexOf(s)) });
+    }
+
+    // líneas de constelación: cada galaxia une sus astros en su propio color, así se ve dónde acaba una y empieza otra
+    const seg: number[] = [], segCol: number[] = [];
+    for (const g of GALAXIES) {
+      const list = this.stars.filter(s => s.galaxy === g.id);
+      const c = new THREE.Color(g.color);
+      for (const [a, b] of constellationEdges(list, 95)) {
+        seg.push(list[a].x, -0.5, list[a].z, list[b].x, -0.5, list[b].z);
+        segCol.push(c.r, c.g, c.b, c.r, c.g, c.b);
+      }
+    }
+    if (seg.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(segCol, 3));
+      this.constellation = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }));
+      this.root.add(this.constellation);
     }
 
     // halo titilante de cada astro, del color de su estado
@@ -541,7 +569,14 @@ export class Universe {
       this.ev.onRoute?.({ label: target.label, dist: left, eta: left / sp, color: target.color ?? '#fdda24' });
     }
 
-    for (const [i, grp] of this.galaxyGroups.entries()) grp.rotation.y = this.t * 0.02 * (i % 2 ? 1 : -1);
+    for (const [i, grp] of this.galaxyGroups.entries()) {
+      grp.rotation.y = this.t * 0.02 * (i % 2 ? 1 : -1);
+      // la galaxia en la que estás resalta su borde; las demás lo atenúan
+      const here = GALAXIES[i] === this.currentGalaxy;
+      const [ring, band] = grp.userData.border as THREE.MeshBasicMaterial[];
+      ring.opacity += ((here ? 0.6 : 0.2) - ring.opacity) * Math.min(1, dt * 3);
+      band.opacity += ((here ? 0.05 : 0.02) - band.opacity) * Math.min(1, dt * 3);
+    }
     for (const v of this.nodes) v.tick(this.t);
     this.scenery.update(dt, this.t);
     this.glowTick?.(this.t);
@@ -620,6 +655,7 @@ export class Universe {
       placed.push({ x, y });
       const el = this.nearLabels[k++];
       el.textContent = this.starName(it.st);
+      el.style.borderColor = galaxyOf(it.st.galaxy).color + '99';
       el.classList.toggle('here', it.st === this.currentStar);
       el.style.display = '';
       el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;

@@ -35,17 +35,20 @@ export interface RavenSnapshot {
   projects: RavenProject[];
 }
 
-/** galaxias que añade el atlas a las del mapa curado (centros en el plano) */
+/**
+ * galaxias que añade el atlas a las del mapa curado (centros en el plano). Cada una tiene un tono propio,
+ * separado del resto en la rueda de color, para que dos constelaciones vecinas no se confundan.
+ */
 export const ATLAS_GALAXIES = [
-  { id: 'rwa', name: 'Bóveda de Activos', color: '#ffd166', center: [0, -880] as [number, number],
+  { id: 'rwa', name: 'Bóveda de Activos', color: '#ff5d5d', center: [0, -880] as [number, number],
     blurb: 'Activos del mundo real tokenizados y stablecoins: bonos, fondos y dólares digitales en Stellar.' },
-  { id: 'ia', name: 'Nebulosa IA', color: '#ff7ab6', center: [-1150, -880] as [number, number],
+  { id: 'ia', name: 'Nebulosa IA', color: '#e05cff', center: [-1150, -880] as [number, number],
     blurb: 'Agentes, pagos entre máquinas y herramientas de IA construidas sobre Stellar.' },
-  { id: 'juegos', name: 'Arcade Estelar', color: '#7cf5c8', center: [1150, -880] as [number, number],
+  { id: 'juegos', name: 'Arcade Estelar', color: '#b8f04a', center: [1150, -880] as [number, number],
     blurb: 'Juegos, coleccionables y herramientas para crear juegos sobre Stellar.' },
-  { id: 'comunidad', name: 'Cúmulo Comunidad', color: '#a0e7ff', center: [-1250, 80] as [number, number],
+  { id: 'comunidad', name: 'Cúmulo Comunidad', color: '#e8eef8', center: [-1250, 80] as [number, number],
     blurb: 'Educación, impacto social y comunidades que acercan Stellar a más gente.' },
-  { id: 'socios', name: 'Puerto de Socios', color: '#e8e8f0', center: [1250, 80] as [number, number],
+  { id: 'socios', name: 'Puerto de Socios', color: '#5b8cff', center: [1250, 80] as [number, number],
     blurb: 'Proveedores que un equipo contrata o integra: anclas, rampas, infraestructura, auditores y más.' },
 ];
 
@@ -131,6 +134,31 @@ export function layoutAtlas(
     });
   }
   return { stars, radius };
+}
+
+/**
+ * Líneas de constelación: árbol de expansión mínima (Prim) entre los astros de una galaxia, sin aristas más
+ * largas que `maxLen`. Une cada astro con sus vecinos más cercanos sin cruzar a otra galaxia y sin formar una
+ * maraña. Devuelve pares de índices sobre `pts`.
+ */
+export function constellationEdges(pts: { x: number; z: number }[], maxLen = 90): [number, number][] {
+  const n = pts.length;
+  if (n < 2) return [];
+  const inTree = new Uint8Array(n), best = new Float64Array(n).fill(Infinity), from = new Int32Array(n).fill(-1);
+  const edges: [number, number][] = [];
+  best[0] = 0;
+  for (let k = 0; k < n; k++) {
+    let u = -1;
+    for (let i = 0; i < n; i++) if (!inTree[i] && (u < 0 || best[i] < best[u])) u = i;
+    inTree[u] = 1;
+    if (from[u] >= 0 && best[u] <= maxLen) edges.push([from[u], u]);
+    for (let v = 0; v < n; v++) {
+      if (inTree[v]) continue;
+      const d = Math.hypot(pts[u].x - pts[v].x, pts[u].z - pts[v].z);
+      if (d < best[v]) { best[v] = d; from[v] = u; }
+    }
+  }
+  return edges;
 }
 
 function hash(g: string, i: number): number {
