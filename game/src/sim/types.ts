@@ -38,6 +38,8 @@ export interface Unit {
   // ticks seguidos sin acercarse al destino (para dar la llegada por buena en un grupo apretado)
   stall?: number;
   lastDist?: number;
+  // ticks hasta poder volver a cruzar un agujero de gusano (evita rebotar entre las dos bocas)
+  warpCd?: number;
 }
 
 export interface QueueItem { item: UnitType | 'era'; progress: number; total: number }
@@ -88,6 +90,9 @@ export interface Planet {
 /** agujero negro: frena a todo lo que vuela dentro de su radio (más cuanto más cerca del centro) */
 export interface BlackHole { pos: Vec; radius: number }
 
+/** agujero de gusano: dos bocas enlazadas; una unidad enviada a una boca sale por la otra */
+export interface Wormhole { a: Vec; b: Vec; radius: number }
+
 export type Entity = Unit | Module | Asteroid | Planet;
 
 export interface Player {
@@ -116,6 +121,7 @@ export type SimEvent =
   | { kind: 'captured'; planet: number; side: Side }
   | { kind: 'era'; side: Side; era: Era }
   | { kind: 'anomaly'; pos: Vec; res: AsteroidKind }
+  | { kind: 'warp'; from: Vec; to: Vec; side: Side }
   | { kind: 'planetDestroyed'; pos: Vec; radius: number; name: string; side: Owner; loot: Res };
 
 export type Command =
@@ -141,4 +147,5 @@ export interface SimState {
   winner: Owner | null;
   winReason: string;
   holes: BlackHole[];
+  wormholes: Wormhole[];
 }

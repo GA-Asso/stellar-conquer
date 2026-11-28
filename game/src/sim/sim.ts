@@ -1,6 +1,6 @@
 // Motor de la simulación: un paso fijo a 20 Hz. Recibe comandos y avanza el estado.
 import {
-  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, DEPOSITS, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
+  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, DEPOSITS, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
 } from './defs';
 import { hexDist, hexKey, hexNeighbors, hexToWorld, worldToHex } from './hex';
 import { Rng } from './rng';
@@ -96,7 +96,7 @@ export function createSim(seed = 1): SimState {
   const rng = new Rng(seed >>> 0 || 1);
   const s: SimState = {
     tick: 0, ledger: 0, seed, rngState: 0, nextId: 1, entities: new Map(),
-    players: [mkPlayer(0), mkPlayer(1)], events: [], winner: null, winReason: '', holes: [],
+    players: [mkPlayer(0), mkPlayer(1)], events: [], winner: null, winReason: '', holes: [], wormholes: WORMHOLES.pairs.map(p => ({ a: { ...p.a }, b: { ...p.b }, radius: WORMHOLES.radius })),
   };
 
   // bases en esquinas opuestas; el lado 1 es el espejo del lado 0
@@ -116,7 +116,7 @@ export function createSim(seed = 1): SimState {
     for (let i = 0; i < n; i++) {
       const a = rng.range(0, Math.PI * 2), r = rng.range(0, spread);
       const p = { x: center.x + Math.cos(a) * r, z: center.z + Math.sin(a) * r };
-      if (s.holes.every(h => dist(h.pos, p) > h.radius + 6)) pts.push(p);
+      if (s.holes.every(h => dist(h.pos, p) > h.radius + 6) && s.wormholes.every(w => dist(w.a, p) > w.radius + 8 && dist(w.b, p) > w.radius + 8)) pts.push(p);
     }
     return pts.map(p => { addAsteroid(s, res, p, rng); return p; });
   };
@@ -211,6 +211,7 @@ export function canPlace(s: SimState, side: Side, type: ModuleType, hex: Hex): P
     if (e.kind === 'planet' && dist(e.pos, pos) < e.radius + 12) return { ok: false, reason: 'Muy cerca de un planeta' };
   }
   if (s.holes.some(h => dist(h.pos, pos) < h.radius + 12)) return { ok: false, reason: 'Demasiado cerca de un agujero negro' };
+  if (s.wormholes.some(w => dist(w.a, pos) < w.radius + 12 || dist(w.b, pos) < w.radius + 12)) return { ok: false, reason: 'Demasiado cerca de un agujero de gusano' };
   let parent: Module | null = null;
   for (const n of hexNeighbors(hex)) {
     const m = occupied.get(hexKey(n));
@@ -290,7 +291,10 @@ export function applyCommand(s: SimState, side: Side, cmd: Command) {
       const spacing = Math.max(4, ...us.map(u => UNITS[u.type].radius * 2.4));
       // los más grandes van al centro, así el grupo no se cruza al llegar
       us.sort((a, b) => UNITS[b.type].radius - UNITS[a.type].radius || dist(a.pos, cmd.to) - dist(b.pos, cmd.to));
-      const spots = formation(cmd.to, us.length, spacing).map((p, i) => clearSpot(s, p, UNITS[us[i]?.type ?? 'drone'].radius));
+      // a la boca de un agujero de gusano se va en fila al centro, sin formación: así cruzan todas
+      const mouth = s.wormholes.flatMap(w => [w.a, w.b]).find(m => dist(m, cmd.to) <= WORMHOLES.radius);
+      const spots = mouth ? us.map(() => ({ ...mouth }))
+        : formation(cmd.to, us.length, spacing).map((p, i) => clearSpot(s, p, UNITS[us[i]?.type ?? 'drone'].radius));
       us.forEach((u, i) => { u.order = { kind: 'move', to: spots[i], aggressive: !!cmd.aggressive }; u.stall = 0; u.lastDist = undefined; });
       break;
     }
@@ -393,12 +397,38 @@ export function step(s: SimState, cmds: SideCommand[] = []) {
     else if (e.kind === 'module') stepModule(s, e);
   }
   separate(s);
+  stepWormholes(s);
   stepPlanets(s);
   stepEnergy(s);
   reap(s);
 
   s.tick++;
   if (s.tick % LEDGER_TICKS === 0) closeLedger(s);
+}
+
+/**
+ * Cruce de agujeros de gusano: solo pasan las unidades a las que se mandó a esa boca (una nave que pasa al lado
+ * no se teletransporta por accidente). Salen por la otra boca, apartadas hacia el interior del mapa.
+ */
+function stepWormholes(s: SimState) {
+  units: for (const e of s.entities.values()) {
+    if (e.kind !== 'unit') continue;
+    if (e.warpCd) { e.warpCd--; continue; }
+    if (e.order.kind !== 'move') continue;
+    for (const w of s.wormholes) {
+      for (const [from, to] of [[w.a, w.b], [w.b, w.a]] as const) {
+        if (dist(e.order.to, from) > w.radius + 14 || dist(e.pos, from) > w.radius * 0.8) continue;
+        const ang = Math.atan2(-to.z, -to.x) + ((e.id * 0.77) % 1.4 - 0.7);
+        const out = { x: to.x + Math.cos(ang) * (w.radius + 5), z: to.z + Math.sin(ang) * (w.radius + 5) };
+        s.events.push({ kind: 'warp', from: { ...e.pos }, to: out, side: e.side });
+        e.pos = out;
+        e.order = { kind: 'idle' };
+        e.warpCd = WORMHOLES.cooldownTicks;
+        e.stall = 0; e.lastDist = undefined;
+        continue units;
+      }
+    }
+  }
 }
 
 function stepEnergy(s: SimState) {

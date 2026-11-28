@@ -200,3 +200,28 @@ describe('planetas destructibles', () => {
     expect(t.order.kind).toBe('idle');
   });
 });
+
+describe('agujeros de gusano', () => {
+  it('las tropas enviadas a una boca salen por la otra y no rebotan', async () => {
+    const { applyCommand, addUnit } = await import('../src/sim/sim');
+    const s = createSim(4);
+    const w = s.wormholes[0];
+    const group = Array.from({ length: 5 }, (_, i) => addUnit(s, 'interceptor', 0, { x: w.a.x + 30, z: w.a.z + i * 4 }));
+    applyCommand(s, 0, { kind: 'move', units: group.map(u => u.id), to: { ...w.a } });
+    for (let i = 0; i < 20 * 8; i++) step(s);
+    for (const u of group) {
+      expect(dist(u.pos, w.b)).toBeLessThan(w.radius + 12);
+      expect(u.order.kind).toBe('idle');
+    }
+  });
+
+  it('una nave que solo pasa al lado no cruza', async () => {
+    const { applyCommand, addUnit } = await import('../src/sim/sim');
+    const s = createSim(4);
+    const w = s.wormholes[0];
+    const u = addUnit(s, 'interceptor', 0, { x: w.a.x + 40, z: w.a.z - 3 });
+    applyCommand(s, 0, { kind: 'move', units: [u.id], to: { x: w.a.x - 40, z: w.a.z - 3 } });
+    for (let i = 0; i < 20 * 6; i++) step(s);
+    expect(dist(u.pos, w.b)).toBeGreaterThan(200);
+  });
+});

@@ -10,6 +10,7 @@ import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mat
 import type { SpaceScene } from './scene';
 import { Scenery } from './scenery';
 import { BlackHoles } from './blackhole';
+import { Wormholes } from './wormhole';
 
 const CARGO_COLORS: Record<AsteroidKind, THREE.Color> = {
   lumen: new THREE.Color(2.2, 1.8, 0.3),
@@ -49,6 +50,7 @@ export class GameView {
   readonly fx: Fx;
   private scenery: Scenery;
   private holes: BlackHoles | null = null;
+  private worms: Wormholes | null = null;
   private views = new Map<number, View>();
   private connectors = new Map<number, THREE.Group>();
   private prev = new Map<number, Vec>();
@@ -116,6 +118,12 @@ export class GameView {
           break;
         }
         case 'anomaly': this.fx.pulse(ev.pos, -1, 60); this.fx.pulse(ev.pos, -1, 30); break;
+        case 'warp': {
+          // destello en la boca de entrada y en la de salida
+          this.fx.pulse(ev.from, ev.side, 16);
+          this.fx.pulse(ev.to, ev.side, 16);
+          break;
+        }
         case 'planetDestroyed': {
           this.fx.planetBurst(ev.pos, ev.radius, PLANET.blast.reach + ev.radius);
           for (let i = 0; i < 6; i++) {
@@ -193,6 +201,8 @@ export class GameView {
     this.scenery.update(t, dt);
     this.holes ??= new BlackHoles(this.space.scene, s.holes);
     this.holes.update(t, this.space.camera);
+    this.worms ??= new Wormholes(this.space.scene, s.wormholes);
+    this.worms.update(t, dt);
     const rocks: Asteroid[] = [];
     for (const e of s.entities.values()) if (e.kind === 'asteroid') rocks.push(e);
     const alive = new Set<number>();
@@ -391,6 +401,7 @@ export class GameView {
     this.space.scene.remove(this.ports);
     this.scenery.dispose();
     this.holes?.dispose();
+    this.worms?.dispose();
   }
 
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado

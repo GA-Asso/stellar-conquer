@@ -7,6 +7,7 @@ import type { GameView } from '../render/view';
 import type { SpaceScene } from '../render/scene';
 import type { Input } from './input';
 import { MODULE_GLYPH, MODULE_ROLE, ROLE_INFO, UNIT_GLYPH } from '../render/icons';
+import { WORMHOLE_COLORS } from '../render/wormhole';
 import { Tutorial } from './tutorial';
 
 // explicación larga de cada botón: para qué sirve y cuándo conviene
@@ -451,6 +452,17 @@ export class Hud {
     c.fillStyle = grad;
     c.fillRect(0, 0, W, W);
 
+    // agujeros de gusano: las dos bocas de cada pareja con su color, unidas por una línea punteada
+    s.wormholes.forEach((w, i) => {
+      const col = WORMHOLE_COLORS[i % WORMHOLE_COLORS.length];
+      const a = this.toMini(w.a.x, w.a.z), b = this.toMini(w.b.x, w.b.z);
+      c.strokeStyle = col; c.globalAlpha = 0.25; c.setLineDash([3, 6]);
+      c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+      for (const p of [a, b]) {
+        c.beginPath(); c.arc(p.x, p.y, Math.max(5, w.radius * k), 0, Math.PI * 2);
+        c.fillStyle = 'rgba(0,0,0,0.6)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = col; c.stroke(); c.lineWidth = 1;
+      }
+    });
     // agujeros negros: zona de frenado en violeta con el centro negro
     for (const h of s.holes) {
       const p = this.toMini(h.pos.x, h.pos.z), r = h.radius * k;

@@ -221,4 +221,10 @@ export const START_RES: Res = cost(250, 200, 50);
  * Agujeros negros: dos parejas en espejo entre las bases. Dentro del radio la velocidad cae hasta `minSpeed`
  * en el centro; rodearlos es más rápido que cruzarlos, pero pueden servir de atajo o de trampa.
  */
+/**
+ * Agujeros de gusano: cada pareja une dos puntos en espejo del mapa (justo para los dos bandos). Mandar tropas
+ * a una boca las saca por la otra: sirven para flanquear o para volver rápido a defender.
+ */
+export const WORMHOLES = { radius: 16, cooldownTicks: 60, pairs: [{ a: { x: -345, z: -250 }, b: { x: 345, z: 250 } }, { a: { x: -378, z: 0 }, b: { x: 378, z: 0 } }] };
+
 export const BLACK_HOLES = { minSpeed: 0.3, spots: [{ x: 150, z: 240, r: 38 }, { x: -215, z: 20, r: 34 }] };
