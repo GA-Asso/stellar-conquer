@@ -1,6 +1,6 @@
 // Motor de la simulación: un paso fijo a 20 Hz. Recibe comandos y avanza el estado.
 import {
-  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, DEPOSITS, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
+  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, DEPOSITS, NEBULAE, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
 } from './defs';
 import { hexDist, hexKey, hexNeighbors, hexToWorld, worldToHex } from './hex';
 import { Rng } from './rng';
@@ -97,6 +97,7 @@ export function createSim(seed = 1): SimState {
   const s: SimState = {
     tick: 0, ledger: 0, seed, rngState: 0, nextId: 1, entities: new Map(),
     players: [mkPlayer(0), mkPlayer(1)], events: [], winner: null, winReason: '', holes: [], wormholes: WORMHOLES.pairs.map(p => ({ a: { ...p.a }, b: { ...p.b }, radius: WORMHOLES.radius })),
+    nebulae: NEBULAE.spots.flatMap(n => [{ pos: { x: n.x, z: n.z }, radius: n.r }, { pos: { x: -n.x, z: -n.z }, radius: n.r }]),
   };
 
   // bases en esquinas opuestas; el lado 1 es el espejo del lado 0
@@ -592,11 +593,27 @@ function damageMult(attackerShipMul: number, attackerModMul: number, target: Uni
   return UNITS[target.type].cls === 'ship' ? attackerShipMul : 1;
 }
 
+/** ¿está `pos` dentro de una nebulosa iónica? */
+export function inNebula(s: SimState, pos: Vec): boolean {
+  return s.nebulae.some(n => dist(n.pos, pos) < n.radius);
+}
+
+/** una unidad en una nebulosa solo la detecta quien esté a menos de NEBULAE.sight de ella */
+export function hiddenFrom(s: SimState, e: Unit | Module, side: Side): boolean {
+  if (e.kind !== 'unit' || e.side === side || !inNebula(s, e.pos)) return false;
+  for (const o of s.entities.values()) {
+    if ((o.kind === 'unit' || o.kind === 'module') && o.side === side && dist(o.pos, e.pos) < NEBULAE.sight + radiusOf(o)) return false;
+  }
+  return true;
+}
+
 function nearestEnemy(s: SimState, side: Side, pos: Vec, range: number, unitsOnly = false): Unit | Module | null {
   let best: Unit | Module | null = null, bd = Infinity;
   for (const e of s.entities.values()) {
     if (e.kind !== 'unit' && e.kind !== 'module') continue;
     if (e.side === side) continue;
+    // escondida en una nebulosa y lejos: no se apunta (sí se puede atacar con una orden directa)
+    if (e.kind === 'unit' && dist(e.pos, pos) > NEBULAE.sight && inNebula(s, e.pos)) continue;
     if (unitsOnly && e.kind !== 'unit') continue;
     const d = dist(e.pos, pos) - radiusOf(e);
     // prioriza unidades armadas sobre módulos y drones

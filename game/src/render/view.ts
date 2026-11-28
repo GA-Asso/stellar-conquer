@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { MODULES, PLANET, UNITS } from '../sim/defs';
 import { hexToWorld } from '../sim/hex';
-import { coreOf, dist } from '../sim/sim';
+import { coreOf, dist, hiddenFrom } from '../sim/sim';
 import type { Asteroid, AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
 import { Fx } from './fx';
 import { iconSprite, MODULE_GLYPH, MODULE_ROLE, ROLE_INFO } from './icons';
@@ -11,6 +11,7 @@ import type { SpaceScene } from './scene';
 import { Scenery } from './scenery';
 import { BlackHoles } from './blackhole';
 import { Wormholes } from './wormhole';
+import { Nebulae } from './nebula';
 
 const CARGO_COLORS: Record<AsteroidKind, THREE.Color> = {
   lumen: new THREE.Color(2.2, 1.8, 0.3),
@@ -51,6 +52,7 @@ export class GameView {
   private scenery: Scenery;
   private holes: BlackHoles | null = null;
   private worms: Wormholes | null = null;
+  private nebulae: Nebulae | null = null;
   private views = new Map<number, View>();
   private connectors = new Map<number, THREE.Group>();
   private prev = new Map<number, Vec>();
@@ -203,12 +205,16 @@ export class GameView {
     this.holes.update(t, this.space.camera);
     this.worms ??= new Wormholes(this.space.scene, s.wormholes);
     this.worms.update(t, dt);
+    this.nebulae ??= new Nebulae(this.space.scene, s.nebulae);
+    this.nebulae.update(t);
     const rocks: Asteroid[] = [];
     for (const e of s.entities.values()) if (e.kind === 'asteroid') rocks.push(e);
     const alive = new Set<number>();
     for (const e of s.entities.values()) {
       alive.add(e.id);
       const v = this.views.get(e.id) ?? this.create(e);
+      // rivales escondidos en una nebulosa: no se dibujan hasta que alguien tuyo se acerque
+      if (e.kind === 'unit') v.root.visible = !hiddenFrom(s, e, this.local);
       let p = this.renderPos(e, alpha);
       if (e.kind === 'unit') {
         // filtro suave: oculta los empujones de un tick entre unidades apretadas
@@ -402,6 +408,7 @@ export class GameView {
     this.scenery.dispose();
     this.holes?.dispose();
     this.worms?.dispose();
+    this.nebulae?.dispose();
   }
 
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado

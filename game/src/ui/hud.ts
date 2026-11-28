@@ -1,7 +1,7 @@
 // HUD: recursos, ledger, panel de selección, botonera de órdenes, minimapa y avisos.
 import { Vector3 } from 'three';
 import { DEPOSITS, ERA_UP, ERAS, LEDGER_TICKS, MAP_HALF, MODULES, TICK_HZ, UNITS } from '../sim/defs';
-import { canAfford, coreOf, hasBuilt, popCap, popUsed } from '../sim/sim';
+import { canAfford, coreOf, hasBuilt, hiddenFrom, popCap, popUsed } from '../sim/sim';
 import type { Command, Entity, Module, ModuleType, Res, Side, SimState, Unit, UnitType } from '../sim/types';
 import type { GameView } from '../render/view';
 import type { SpaceScene } from '../render/scene';
@@ -452,6 +452,15 @@ export class Hud {
     c.fillStyle = grad;
     c.fillRect(0, 0, W, W);
 
+    // nebulosas: nubes azules donde el rival puede esconderse
+    for (const n of s.nebulae) {
+      const p = this.toMini(n.pos.x, n.pos.z), r = n.radius * k;
+      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      g.addColorStop(0, 'rgba(70,150,255,0.35)');
+      g.addColorStop(1, 'rgba(110,90,255,0.04)');
+      c.fillStyle = g;
+      c.beginPath(); c.arc(p.x, p.y, r, 0, Math.PI * 2); c.fill();
+    }
     // agujeros de gusano: las dos bocas de cada pareja con su color, unidas por una línea punteada
     s.wormholes.forEach((w, i) => {
       const col = WORMHOLE_COLORS[i % WORMHOLE_COLORS.length];
@@ -500,6 +509,7 @@ export class Hud {
     }
     for (const e of s.entities.values()) {
       if (e.kind !== 'module' && e.kind !== 'unit') continue;
+      if (hiddenFrom(s, e, this.side)) continue;
       const p = this.toMini(e.pos.x, e.pos.z);
       c.fillStyle = col(e.side);
       if (e.kind === 'module') {
@@ -540,6 +550,7 @@ export class Hud {
     const sel = this.input.ui.selected;
     for (const e of s.entities.values()) {
       if (e.kind !== 'unit' && e.kind !== 'module') continue;
+      if (hiddenFrom(s, e, this.side)) continue;
       const damaged = e.hp < e.maxHp;
       if (!sel.has(e.id) && !damaged && !(e.kind === 'module' && e.built < 1)) continue;
       const wp = this.view.worldPoint(e);

@@ -227,4 +227,10 @@ export const START_RES: Res = cost(250, 200, 50);
  */
 export const WORMHOLES = { radius: 16, cooldownTicks: 60, pairs: [{ a: { x: -345, z: -250 }, b: { x: 345, z: 250 } }, { a: { x: -378, z: 0 }, b: { x: 378, z: 0 } }] };
 
+/**
+ * Nebulosas iónicas, en espejo: las unidades dentro solo se detectan desde `sight` unidades. Sirven para
+ * esconder un ejército y emboscar; el rival ve una nube, no lo que hay dentro.
+ */
+export const NEBULAE = { sight: 20, spots: [{ x: 80, z: 130, r: 46 }, { x: -300, z: -60, r: 40 }] };
+
 export const BLACK_HOLES = { minSpeed: 0.3, spots: [{ x: 150, z: 240, r: 38 }, { x: -215, z: 20, r: 34 }] };

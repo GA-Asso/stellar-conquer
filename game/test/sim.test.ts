@@ -225,3 +225,20 @@ describe('agujeros de gusano', () => {
     expect(dist(u.pos, w.b)).toBeGreaterThan(200);
   });
 });
+
+describe('nebulosas iónicas', () => {
+  it('una nave escondida en la nebulosa no atrae disparos desde lejos, pero de cerca sí', async () => {
+    const { addUnit } = await import('../src/sim/sim');
+    const s = createSim(6);
+    const n = s.nebulae[0];
+    const hidden = addUnit(s, 'interceptor', 1, { ...n.pos });
+    s.players[1].holdFire = true;
+    const far = addUnit(s, 'frigate', 0, { x: n.pos.x + n.radius + 10, z: n.pos.z });
+    for (let i = 0; i < 20; i++) step(s);
+    expect(hidden.hp).toBe(hidden.maxHp);
+    expect(far.order.kind).toBe('idle');
+    far.pos = { x: n.pos.x + 8, z: n.pos.z };
+    for (let i = 0; i < 60; i++) step(s);
+    expect(hidden.hp).toBeLessThan(hidden.maxHp);
+  });
+});

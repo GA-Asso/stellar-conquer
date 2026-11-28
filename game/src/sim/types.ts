@@ -93,6 +93,9 @@ export interface BlackHole { pos: Vec; radius: number }
 /** agujero de gusano: dos bocas enlazadas; una unidad enviada a una boca sale por la otra */
 export interface Wormhole { a: Vec; b: Vec; radius: number }
 
+/** nebulosa iónica: lo que está dentro no se ve ni se apunta desde lejos (emboscadas) */
+export interface Nebula { pos: Vec; radius: number }
+
 export type Entity = Unit | Module | Asteroid | Planet;
 
 export interface Player {
@@ -148,4 +151,5 @@ export interface SimState {
   winReason: string;
   holes: BlackHole[];
   wormholes: Wormhole[];
+  nebulae: Nebula[];
 }
