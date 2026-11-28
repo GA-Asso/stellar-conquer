@@ -8,7 +8,7 @@ import type { SpaceScene } from '../render/scene';
 import type { Input } from './input';
 import { MODULE_GLYPH, MODULE_ROLE, ROLE_INFO, svgIcon, UNIT_GLYPH } from '../render/icons';
 import { WORMHOLE_COLORS } from '../render/wormhole';
-import { moduleThumb } from '../render/thumbs';
+import { moduleThumb, unitThumb } from '../render/thumbs';
 import { Tutorial } from './tutorial';
 
 // explicación larga de cada botón: para qué sirve y cuándo conviene
@@ -37,7 +37,7 @@ const UNIT_HELP: Record<UnitType, string> = {
   dreadnought: 'Nave insignia, enorme y muy resistente. Ideal para el asalto final.',
 };
 
-interface Button { key: string; label: string; sub: string; cost?: Res; enabled: boolean; why?: string; run: () => void; glyph?: string; tint?: string; help?: string; module?: ModuleType }
+interface Button { key: string; label: string; sub: string; cost?: Res; enabled: boolean; why?: string; run: () => void; glyph?: string; tint?: string; help?: string; module?: ModuleType; img?: string }
 
 /** nombre de la función a partir de su color, para el título del ícono del botón */
 const ROLE_LABEL: Record<string, string> = Object.fromEntries(Object.values(ROLE_INFO).map(r => [r.color, r.label]));
@@ -285,7 +285,7 @@ export class Hud {
             return `<span class="slot full${i === 0 ? ' now' : ''}" title="${name}">${i === 0 ? `<i style="height:${(it.progress / it.total) * 100}%"></i>` : ''}<b>${g}</b></span>`;
           }).join('');
           const nowName = q.item === 'era' ? 'Avance de era' : UNITS[q.item].name;
-          extra = `<div class="q-now"><span>${nowName} · <b>${Math.ceil(q.total - q.progress)} s</b></span><span>${e.queue.length}/${QUEUE_MAX} en cola</span></div><div class="queue">${slots}</div>`;
+          extra = `<div class="q-now"><span>${nowName} · <b>${q.progress >= q.total ? 'falta población' : `${Math.ceil(q.total - q.progress)} s`}</b></span><span>${e.queue.length}/${QUEUE_MAX} en cola</span></div><div class="queue">${slots}</div>`;
         }
         if (e.type === 'beacon' && e.built >= 1) extra += `<div class="stats"><span>Quórum: ${s.players[e.side].beaconLedgers}/30 ledgers</span></div>`;
         const hint = e.side !== this.side ? 'Módulo enemigo: los robots le hacen el doble de daño.'
@@ -377,7 +377,7 @@ export class Hud {
         const eraOk = pl.era >= d.era;
         const afford = canAfford(pl.res, d.cost);
         buttons.push({
-          key: d.hotkey, label: d.name, sub: costText(d.cost), cost: d.cost, enabled: eraOk && afford, glyph: MODULE_GLYPH[t], tint: ROLE_INFO[MODULE_ROLE[t]].color, help: MODULE_HELP[t], module: t,
+          key: d.hotkey, label: d.name, sub: costText(d.cost), cost: d.cost, enabled: eraOk && afford, glyph: MODULE_GLYPH[t], tint: ROLE_INFO[MODULE_ROLE[t]].color, help: MODULE_HELP[t], module: t, img: moduleThumb(t, this.side),
           why: !eraOk ? `Era ${ERAS[d.era].name}` : !afford ? 'Faltan recursos' : '',
           run: () => this.input.startBuild(t),
         });
@@ -390,7 +390,7 @@ export class Hud {
         const afford = canAfford(pl.res, d.cost);
         buttons.push({
           key: d.hotkey, label: d.name, sub: costText(d.cost), enabled: eraOk && afford && mod.queue.length < QUEUE_MAX,
-          glyph: UNIT_GLYPH[t as UnitType], help: UNIT_HELP[t as UnitType],
+          glyph: UNIT_GLYPH[t as UnitType], help: UNIT_HELP[t as UnitType], img: unitThumb(t as UnitType, this.side),
           why: !eraOk ? `Era ${ERAS[d.era].name}` : mod.queue.length >= QUEUE_MAX ? `Cola llena (${QUEUE_MAX})` : !afford ? 'Faltan recursos' : '',
           run: () => this.send({ kind: 'train', module: mod.id, unit: t }),
         });
@@ -417,8 +417,8 @@ export class Hud {
     if (key === this.buttonsKey) return;
     this.buttonsKey = key;
     this.el.cmds.innerHTML = buttons.map((b, i) => `
-      <button data-i="${i}" class="${b.enabled ? '' : 'off'} ${b.key === this.highlight ? 'hl' : ''}">
-        <kbd>${b.key === 'Backspace' ? '⌫' : b.key}</kbd><span class="c-top">${b.glyph ? `<i class="g"${b.tint ? ` style="color:${b.tint}" title="${ROLE_LABEL[b.tint] ?? ''}"` : ''}>${b.glyph}</i>` : ''}<b>${b.label}</b></span><small>${b.sub}</small>${b.why ? `<em>${b.why}</em>` : ''}
+      <button data-i="${i}" class="${b.enabled ? '' : 'off'} ${b.key === this.highlight ? 'hl' : ''} ${b.img ? 'has-img' : ''}">
+        <kbd>${b.key === 'Backspace' ? '⌫' : b.key}</kbd>${b.img ? `<img class="c-img" src="${b.img}" alt=""${b.tint ? ` style="--role:${b.tint}"` : ''}>` : ''}<span class="c-top">${!b.img && b.glyph ? `<i class="g"${b.tint ? ` style="color:${b.tint}" title="${ROLE_LABEL[b.tint] ?? ''}"` : ''}>${b.glyph}</i>` : ''}<b>${b.label}</b></span><small>${b.sub}</small>${b.why ? `<em>${b.why}</em>` : ''}
       </button>`).join('');
   }
 

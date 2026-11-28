@@ -1,8 +1,8 @@
 // Miniaturas de los módulos para las tarjetas del HUD: se renderiza el mismo modelo 3D del juego en un lienzo
 // aparte, en vista de tres cuartos, y se guarda como imagen. Se hace una vez por módulo y bando.
 import * as THREE from 'three';
-import type { ModuleType, Side } from '../sim/types';
-import { buildModule } from './models';
+import type { ModuleType, Side, UnitType } from '../sim/types';
+import { buildModule, buildUnit } from './models';
 
 const SIZE = 256;
 const cache = new Map<string, string>();
@@ -30,14 +30,31 @@ function setup() {
 
 /** imagen (data URL) del módulo tal como se ve en la partida */
 export function moduleThumb(type: ModuleType, side: Side): string {
-  const id = `${type}:${side}`;
+  return thumb(`m:${type}:${side}`, () => buildModule(type, side).group);
+}
+
+/** imagen (data URL) de la unidad tal como se ve en la partida */
+export function unitThumb(type: UnitType, side: Side): string {
+  return thumb(`u:${type}:${side}`, () => buildUnit(type, side).group);
+}
+
+function thumb(id: string, make: () => THREE.Group): string {
   const hit = cache.get(id);
   if (hit) return hit;
   if (!renderer) setup();
-  const model = buildModule(type, side).group;
+  const model = make();
+  // fuera de la foto lo que estira el encuadre sin decir nada del edificio (p. ej. el rayo del núcleo)
+  model.traverse(o => { if (o.userData.noThumb) o.visible = false; });
   scene!.add(model);
-  // encuadre: la caja del modelo centrada, vista desde arriba en diagonal
-  const box = new THREE.Box3().setFromObject(model);
+  model.updateMatrixWorld(true);
+  // encuadre: la caja de lo visible centrada, vista desde arriba en diagonal
+  const box = new THREE.Box3();
+  model.traverse(o => {
+    if (!(o instanceof THREE.Mesh)) return;
+    let v = true;
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) { v = false; break; }
+    if (v) box.expandByObject(o);
+  });
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
   const r = Math.max(size.x, size.y * 0.9, size.z) * 0.62;
   const dist = r / Math.tan(THREE.MathUtils.degToRad(camera!.fov / 2)) * 1.05;

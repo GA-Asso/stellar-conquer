@@ -688,3 +688,15 @@ a.u-srcl:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,
 .card-g .vi { width: 20px; height: 20px; }
 .queue .slot b .vi { width: 15px; height: 15px; }
 .tip h4 i .vi { width: 18px; height: 18px; }
+
+/* botones con la imagen del edificio o la unidad: se reconoce de un vistazo qué vas a construir.
+   Imagen arriba a la izquierda (con la tecla encima), nombre a su derecha y costo abajo a todo lo ancho */
+.commands button.has-img { padding: 4px 5px 3px 46px; justify-content: flex-start; gap: 0; }
+.commands button.has-img .c-top { padding-right: 0; min-height: 34px; align-items: center; }
+.commands button.has-img b { font-size: 10.5px; }
+.commands button.has-img small { position: absolute; left: 5px; right: 4px; bottom: 3px; }
+.commands button.has-img kbd { left: 4px; right: auto; top: 3px; background: rgba(6,8,16,0.8); z-index: 1; }
+.c-img { position: absolute; left: 3px; top: 3px; width: 40px; height: 38px; object-fit: cover; border-radius: 3px; pointer-events: none;
+  background: radial-gradient(90% 70% at 50% 85%, color-mix(in srgb, var(--role, #2ee6ff) 30%, transparent), transparent 75%), rgba(255,255,255,0.03);
+  border-bottom: 2px solid var(--role, rgba(46,230,255,0.5)); }
+.commands button.off .c-img { filter: grayscale(0.8) brightness(0.8); }

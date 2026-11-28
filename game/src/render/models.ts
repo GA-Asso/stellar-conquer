@@ -149,6 +149,7 @@ export function buildModule(type: ModuleType, side: Owner): ModuleModel {
       // antena y haz vertical: la ciudadela se encuentra aunque la base crezca alrededor
       g.add(at(cyl(0.35, 0.5, 10, m.gunmetal, 8), 0, 31, 0));
       const beam = cyl(1.1, 1.8, 90, m.exhaust, 16);
+      beam.userData.noThumb = true;
       g.add(at(beam, 0, 70, 0));
       // logo de Stellar flotando y girando sobre la torre
       const emblemPivot = at(new THREE.Group(), 0, 40, 0);
@@ -269,36 +270,62 @@ export function buildModule(type: ModuleType, side: Owner): ModuleModel {
       break;
     }
     case 'lab': {
+      // laboratorio: un gran matraz de vidrio con líquido violeta burbujeante, tubos de ensayo y un ábaco
       g.add(hexBase(m, 7));
-      const dome = new THREE.Mesh(new THREE.SphereGeometry(4.2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), m.glass);
-      g.add(at(dome, -1.2, 1.4, 1));
-      g.add(at(sphere(1.2, m.glow, 12, 8), -1.2, 3, 1));
-      // un soroban (ábaco japonés) gigante: varillas con cuentas que se deslizan calculando
-      const abacus = at(new THREE.Group(), 2.2, 6.5, -2.6);
+      const liquid = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.1, 0.55, 2.2) });
+      const flask = new THREE.Group();
+      flask.position.set(-1.2, 1.4, 0.8);
+      // cuerpo cónico con el líquido dentro y cuello largo
+      flask.add(at(cyl(1.3, 4.6, 6, m.glass, 20), 0, 3, 0));
+      flask.add(at(cyl(1.15, 4.1, 3.2, liquid, 20), 0, 1.7, 0));
+      flask.add(at(cyl(1.1, 1.1, 4, m.glass, 16), 0, 8, 0));
+      flask.add(at(flat(torus(1.3, 0.25, m.hull, 20)), 0, 10, 0));
+      const bubbles: THREE.Mesh[] = [];
+      for (let i = 0; i < 4; i++) {
+        const b = sphere(0.35, liquid, 8, 6);
+        b.userData.phase = i / 4;
+        flask.add(b);
+        bubbles.push(b);
+      }
+      g.add(flask);
+      // gradilla con tubos de ensayo de colores
+      const rack = at(new THREE.Group(), 3.4, 1.4, 2.4);
+      rack.add(at(box(4.2, 0.4, 1.4, m.hull), 0, 2.2, 0));
+      [[1.1, 0.55, 2.2], [0.3, 1.6, 1.2], [2, 1.2, 0.3]].forEach((c, i) => {
+        const x = -1.3 + i * 1.3;
+        rack.add(at(cyl(0.45, 0.45, 3.6, m.glass, 10), x, 1.8, 0));
+        rack.add(at(cyl(0.38, 0.38, 2, new THREE.MeshBasicMaterial({ color: new THREE.Color(...c) }), 10), x, 1, 0));
+      });
+      g.add(rack);
+      // ábaco (soroban) de cálculo al fondo
+      const abacus = at(new THREE.Group(), 2.6, 5.2, -3);
       abacus.rotation.y = -0.5;
-      for (const y of [-3, 3]) abacus.add(at(box(8, 0.5, 0.5, m.hull), 0, y, 0));
-      for (const x of [-4, 4]) abacus.add(at(box(0.5, 6.5, 0.5, m.hull), x, 0, 0));
-      abacus.add(at(box(8, 0.25, 0.3, m.trim), 0, 1.4, 0));
+      for (const y of [-2, 2]) abacus.add(at(box(5.4, 0.4, 0.4, m.hull), 0, y, 0));
+      for (const x of [-2.7, 2.7]) abacus.add(at(box(0.4, 4.4, 0.4, m.hull), x, 0, 0));
       const beads: THREE.Mesh[] = [];
-      for (let i = 0; i < 5; i++) {
-        const x = -3 + i * 1.5;
-        abacus.add(at(cyl(0.08, 0.08, 6, m.hull, 4), x, 0, 0));
-        for (let j = 0; j < 3; j++) {
-          const bead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 6), j === 0 ? m.glow : m.trim);
+      for (let i = 0; i < 4; i++) {
+        const x = -1.8 + i * 1.2;
+        abacus.add(at(cyl(0.07, 0.07, 4, m.hull, 4), x, 0, 0));
+        for (let j = 0; j < 2; j++) {
+          const bead = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 6), j === 0 ? m.glow : m.trim);
           bead.scale.y = 0.6;
-          bead.position.set(x, -2.2 + j * 0.7, 0);
+          bead.position.set(x, -1.4 + j * 0.6, 0);
           bead.userData.base = bead.position.y;
           bead.userData.phase = i * 1.3 + j * 0.4;
           abacus.add(bead);
           beads.push(bead);
         }
       }
-      g.add(at(box(1, 6.5, 1, m.dark), 2.2, 3.2, -2.6));
+      g.add(at(box(0.8, 4.2, 0.8, m.dark), 2.6, 2.4, -3));
       g.add(abacus);
-      tick = t => beads.forEach(b => {
-        const k = Math.max(0, Math.sin(t * 1.2 + b.userData.phase));
-        b.position.y = b.userData.base + k * 1.6;
-      });
+      tick = t => {
+        beads.forEach(b => { b.position.y = b.userData.base + Math.max(0, Math.sin(t * 1.2 + b.userData.phase)) * 1.2; });
+        bubbles.forEach((b, i) => {
+          const k = (t * 0.5 + b.userData.phase) % 1;
+          b.position.set(Math.sin(i * 2 + t) * 0.4, 1 + k * 8.5, Math.cos(i * 2 + t) * 0.4);
+          b.scale.setScalar(1 - k * 0.6);
+        });
+      };
       break;
     }
     case 'turret': {
@@ -336,28 +363,35 @@ export function buildModule(type: ModuleType, side: Owner): ModuleModel {
       break;
     }
     case 'seti': {
-      // radiotelescopio: plato parabólico inclinado sobre una montura que barre el cielo, con ondas que suben
+      // radiotelescopio: gran plato parabólico blanco sobre una torre de celosía, con ondas de señal que suben
       g.add(hexBase(m, 7));
-      g.add(at(cyl(1.6, 2.2, 3, m.plating, 10), 0, 2.6, 0));
-      const mount = at(new THREE.Group(), 0, 5.5, 0);
-      const dish = new THREE.Mesh(new THREE.SphereGeometry(5.2, 28, 10, 0, Math.PI * 2, 0, Math.PI / 3.2), m.hull);
-      dish.material = m.hull;
+      // torre de celosía de cuatro patas
+      for (const [x, z] of [[-1.8, -1.8], [1.8, -1.8], [1.8, 1.8], [-1.8, 1.8]]) {
+        const leg = at(cyl(0.22, 0.32, 6.4, m.gunmetal, 6), x * 0.7, 4.4, z * 0.7);
+        leg.rotation.set(z * 0.08, 0, -x * 0.08);
+        g.add(leg);
+      }
+      for (const y of [3, 5.6]) g.add(at(flat(torus(1.5, 0.12, m.gunmetal, 4)), 0, y, 0));
+      const mount = at(new THREE.Group(), 0, 7.6, 0);
+      // el plato arranca mirando hacia la cámara (diagonal +x +z); luego barre el cielo girando
+      mount.rotation.y = -2.36;
+      const dishMat = new THREE.MeshStandardMaterial({ color: 0xf2f4f8, metalness: 0.25, roughness: 0.4, side: THREE.DoubleSide });
+      const dish = new THREE.Mesh(new THREE.SphereGeometry(6, 32, 10, 0, Math.PI * 2, 0, Math.PI / 3.4), dishMat);
       dish.rotation.x = Math.PI;
-      dish.scale.y = 0.55;
+      dish.scale.y = 0.6;
       const tilt = new THREE.Group();
-      tilt.rotation.x = -0.7;
-      tilt.add(at(dish, 0, 2.6, 0));
-      tilt.add(at(flat(torus(4.6, 0.18, m.trim, 40)), 0, 0.5, 0));
+      tilt.rotation.x = -0.75;
+      tilt.add(at(dish, 0, 3.2, 0));
+      tilt.add(at(flat(torus(5.2, 0.22, m.trim, 48)), 0, 0.55, 0));
       for (let i = 0; i < 3; i++) {
-        const strut = at(cyl(0.08, 0.08, 4.4, m.hull, 4), Math.cos(i * 2.1) * 1.6, 2.4, Math.sin(i * 2.1) * 1.6);
-        strut.lookAt(0, 4.4, 0);
+        const strut = at(cyl(0.1, 0.1, 5, m.hull, 4), Math.cos(i * 2.1) * 2.2, 2.6, Math.sin(i * 2.1) * 2.2);
+        strut.lookAt(0, 5.2, 0);
         tilt.add(strut);
       }
-      tilt.add(at(sphere(0.5, m.glow, 10, 8), 0, 4.6, 0));
+      tilt.add(at(sphere(0.7, m.glow, 12, 8), 0, 5.2, 0));
       mount.add(tilt);
       g.add(mount);
       spins.push({ obj: mount, axis: 'y', speed: 0.25 });
-      // ondas de señal: anillos que suben y se apagan
       const waves: THREE.Mesh[] = [];
       for (let i = 0; i < 3; i++) {
         const w = flat(torus(2, 0.1, m.portal, 32));
@@ -366,7 +400,7 @@ export function buildModule(type: ModuleType, side: Owner): ModuleModel {
       }
       tick = t => waves.forEach((w, i) => {
         const k = (t * 0.4 + i / 3) % 1;
-        w.position.y = 11 + k * 10;
+        w.position.y = 14 + k * 10;
         w.scale.setScalar(0.6 + k * 2);
         w.visible = k < 0.92;
       });
@@ -455,22 +489,32 @@ export function buildModule(type: ModuleType, side: Owner): ModuleModel {
       break;
     }
     case 'matrioshka': {
-      // cerebro Matrioshka: capas esféricas de computación anidadas, cada una girando en otro eje
+      // centro de cómputo: torre escalonada de bastidores de servidores con franjas de luz violeta que
+      // parpadean como datos, aletas de refrigeración y un núcleo de luz en la cima
       g.add(hexBase(m, 8));
-      g.add(at(cyl(2, 3.4, 3, m.plating, 8), 0, 2.4, 0));
-      const center = at(new THREE.Group(), 0, 11, 0);
-      center.add(sphere(1.8, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2, 1.2) }), 20, 14));
-      const shells: THREE.Object3D[] = [];
-      [[3.2, 1], [4.6, 0], [6, 1]].forEach(([r, wire], i) => {
-        const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), wire
-          ? new THREE.MeshBasicMaterial({ color: SIDE_COLORS[side].clone().multiplyScalar(1.3), wireframe: true, transparent: true, opacity: 0.5 })
-          : new THREE.MeshStandardMaterial({ color: 0x9aa6c4, metalness: 0.6, roughness: 0.3, transparent: true, opacity: 0.35, flatShading: true }));
-        shell.rotation.set(i * 0.6, i, 0);
-        center.add(shell);
-        shells.push(shell);
+      const data = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 0.7, 2.4) });
+      const leds: THREE.Mesh[] = [];
+      const tiers: [number, number, number][] = [[10, 3.2, 1.4], [8, 3.2, 4.6], [6, 3.2, 7.8], [4, 2.6, 10.7]];
+      tiers.forEach(([w, h, y], ti) => {
+        g.add(at(box(w, h, w, m.plating), 0, y + h / 2, 0));
+        // franjas de datos en las cuatro caras
+        for (let f = 0; f < 4; f++) {
+          const a = f * Math.PI / 2;
+          for (let r = 0; r < 2; r++) {
+            const led = box(w * 0.8, 0.28, 0.12, data);
+            led.position.set(Math.sin(a) * (w / 2 + 0.05), y + 0.9 + r * 1.2, Math.cos(a) * (w / 2 + 0.05));
+            led.rotation.y = a;
+            led.userData.phase = ti * 0.7 + f * 0.3 + r * 0.5;
+            g.add(led);
+            leds.push(led);
+          }
+        }
+        g.add(at(box(w + 0.4, 0.3, w + 0.4, m.hull), 0, y + h, 0));
       });
-      g.add(center);
-      tick = t => shells.forEach((sh, i) => { sh.rotation.y = t * (0.3 + i * 0.15) * (i % 2 ? -1 : 1); sh.rotation.x = t * 0.1 * (i + 1); });
+      // aletas de refrigeración a los lados de la base
+      for (let i = -2; i <= 2; i++) for (const sx of [-1, 1]) g.add(at(box(1.6, 2.6, 0.25, m.gunmetal), sx * 5.8, 2.8, i * 1.6));
+      g.add(at(sphere(1.4, new THREE.MeshBasicMaterial({ color: new THREE.Color(2, 1.4, 2.6) }), 16, 12), 0, 15, 0));
+      tick = t => leds.forEach(l => { l.visible = Math.sin(t * 3 + l.userData.phase * 4) > -0.6; });
       break;
     }
   }
