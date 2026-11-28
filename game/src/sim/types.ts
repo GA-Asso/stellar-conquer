@@ -78,6 +78,11 @@ export interface Planet {
   owner: Owner;
   // -1..1: negativo avanza hacia el lado 1, positivo hacia el lado 0
   capture: number;
+  // integridad: un planeta se puede bombardear hasta romperlo en un campo de escombros ricos
+  hp: number;
+  maxHp: number;
+  // último bando que lo dañó: se lleva el botín si lo rompe
+  lastAttacker: Owner;
 }
 
 /** agujero negro: frena a todo lo que vuela dentro de su radio (más cuanto más cerca del centro) */
@@ -110,7 +115,8 @@ export type SimEvent =
   | { kind: 'ledger'; seq: number }
   | { kind: 'captured'; planet: number; side: Side }
   | { kind: 'era'; side: Side; era: Era }
-  | { kind: 'anomaly'; pos: Vec; res: AsteroidKind };
+  | { kind: 'anomaly'; pos: Vec; res: AsteroidKind }
+  | { kind: 'planetDestroyed'; pos: Vec; radius: number; name: string; side: Owner; loot: Res };
 
 export type Command =
   | { kind: 'move'; units: number[]; to: Vec; aggressive?: boolean }

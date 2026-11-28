@@ -167,3 +167,36 @@ describe('agujeros negros', () => {
     expect(canPlace(s, 0, 'anchor', worldToHex(h.pos)).ok).toBe(false);
   });
 });
+
+describe('planetas destructibles', () => {
+  it('un bombardeo rompe el planeta: botín, onda expansiva y escombros ricos', async () => {
+    const { applyCommand, addUnit } = await import('../src/sim/sim');
+    const s = createSim(9);
+    const p = planets(s).find(x => x.name === 'Horizonte')!;
+    const rocksBefore = asteroids(s).length;
+    const titans = Array.from({ length: 6 }, (_, i) => addUnit(s, 'titan', 0, { x: p.pos.x + p.radius + 6, z: p.pos.z - 10 + i * 4 }));
+    const near = addUnit(s, 'interceptor', 1, { x: p.pos.x - p.radius - 4, z: p.pos.z });
+    near.hp = 40;
+    s.players[1].holdFire = true;
+    applyCommand(s, 0, { kind: 'attack', units: titans.map(t => t.id), target: p.id });
+    const lumens0 = s.players[0].res.lumens;
+    let broke = false;
+    for (let i = 0; i < 20 * 120 && !broke; i++) { step(s); broke = s.events.some(e => e.kind === 'planetDestroyed'); }
+    expect(broke).toBe(true);
+    expect(s.entities.has(p.id)).toBe(false);
+    expect(s.players[0].res.lumens).toBeGreaterThan(lumens0 + p.radius * 10);
+    expect(asteroids(s).length).toBeGreaterThan(rocksBefore);
+    step(s);
+    expect(s.entities.has(near.id)).toBe(false);
+  });
+
+  it('no puedes bombardear tus propios planetas', async () => {
+    const { applyCommand, addUnit } = await import('../src/sim/sim');
+    const s = createSim(9);
+    const p = planets(s)[0];
+    p.owner = 0;
+    const t = addUnit(s, 'titan', 0, { x: p.pos.x + 30, z: p.pos.z });
+    applyCommand(s, 0, { kind: 'attack', units: [t.id], target: p.id });
+    expect(t.order.kind).toBe('idle');
+  });
+});

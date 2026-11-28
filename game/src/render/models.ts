@@ -899,7 +899,7 @@ void main() {
 }`;
 const planetFrag = /* glsl */ `
 varying vec3 vN; varying vec3 vP; varying vec3 vW;
-uniform vec3 uA; uniform vec3 uB; uniform vec3 uOwner; uniform float uSeed; uniform float uTime; uniform vec3 uSun;
+uniform vec3 uA; uniform vec3 uB; uniform vec3 uOwner; uniform float uSeed; uniform float uTime; uniform vec3 uSun; uniform float uDamage;
 float hash(vec3 p) { p = fract(p * 0.3183099 + uSeed); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float noise(vec3 x) {
   vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -919,6 +919,14 @@ void main() {
   // borde atmosférico
   float rim = pow(1.0 - max(dot(vN, normalize(cameraPosition - vW)), 0.0), 3.0);
   col += mix(vec3(0.4, 0.6, 1.0), uOwner, 0.6) * rim * 1.2;
+  // daño: la corteza se oscurece y se abren grietas de magma que laten, más anchas cuanto más roto está
+  if (uDamage > 0.02) {
+    float vein = 1.0 - abs(fbm(p * 4.5 + 11.0) - 0.5) * 2.0;
+    float crack = smoothstep(0.97 - uDamage * 0.14, 0.995, vein);
+    float beat = 0.75 + 0.25 * sin(uTime * (3.0 + uDamage * 6.0));
+    col *= 1.0 - uDamage * 0.45;
+    col += vec3(2.6, 0.9, 0.25) * crack * beat * smoothstep(0.0, 0.25, uDamage);
+  }
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -945,7 +953,7 @@ export function buildPlanet(index: number, radius: number): { group: THREE.Group
     vertexShader: planetVert, fragmentShader: planetFrag,
     uniforms: {
       uA: { value: new THREE.Color(a) }, uB: { value: new THREE.Color(b) }, uOwner: { value: new THREE.Color(0x222233) },
-      uSeed: { value: 0.1 + index * 0.137 }, uTime: { value: 0 }, uSun: { value: new THREE.Vector3(-0.5, 0.7, 0.4) },
+      uSeed: { value: 0.1 + index * 0.137 }, uTime: { value: 0 }, uSun: { value: new THREE.Vector3(-0.5, 0.7, 0.4) }, uDamage: { value: 0 },
     },
   });
   const g = new THREE.Group();

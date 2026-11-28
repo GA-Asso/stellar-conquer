@@ -204,6 +204,12 @@ export const ANOMALY = { everyLedgers: 36, rocks: 5, spread: 9 };
 
 export const PLANET = {
   incomePerLedger: 15,
+  // integridad por unidad de radio: un planeta mediano aguanta un bombardeo largo
+  hpPerRadius: 220,
+  // al romperse: botín inmediato por unidad de radio, onda expansiva y escombros con más recursos
+  loot: { lumens: 15, metal: 15, energy: 6 },
+  blast: { reach: 30, damage: 90 },
+  debris: { perRadius: 0.9, richness: 1.6 },
   captureRadius: 6,
   // segundos con un robot solo para pasar de neutral a capturado
   captureSeconds: 10,

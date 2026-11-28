@@ -21,6 +21,11 @@ export class OrbitRig {
   bound = MAP_HALF + 20;
   private goal = { yaw: this.yaw, pitch: this.pitch, distance: this.distance, target: this.target.clone() };
 
+  /** temblor de cámara (0..1+): decae solo; lo usan las explosiones grandes */
+  private trauma = 0;
+  private shakeT = 0;
+  shake(amount: number) { this.trauma = Math.min(1.5, this.trauma + amount); }
+
   constructor(public camera: THREE.PerspectiveCamera) {}
 
   rotate(dYaw: number, dPitch: number) {
@@ -57,6 +62,14 @@ export class OrbitRig {
       this.target.z + Math.cos(this.yaw) * cp * this.distance,
     );
     this.camera.lookAt(this.target);
+    if (this.trauma > 0.001) {
+      this.shakeT += dt;
+      const a = this.trauma * this.trauma * this.distance * 0.025;
+      this.camera.position.x += Math.sin(this.shakeT * 53) * a;
+      this.camera.position.y += Math.sin(this.shakeT * 41 + 1) * a * 0.6;
+      this.camera.position.z += Math.cos(this.shakeT * 47 + 2) * a;
+      this.trauma = Math.max(0, this.trauma - dt * 0.9);
+    }
   }
 }
 

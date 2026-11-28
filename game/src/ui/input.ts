@@ -224,6 +224,13 @@ export class Input {
       this.ui.ping = { pos: target.pos, age: 0, kind: 'attack' };
       return;
     }
+    // planeta ajeno: con Ctrl, o si no llevas robots (que son los que conquistan), se bombardea
+    if (target?.kind === 'planet' && target.owner !== this.side && us.some(u => u.type !== 'drone')
+      && (attackMove || !us.some(u => UNITS[u.type].cls === 'robot'))) {
+      this.send({ kind: 'attack', units: ids, target: target.id });
+      this.ui.ping = { pos: target.pos, age: 0, kind: 'attack' };
+      return;
+    }
     if (target?.kind === 'asteroid') {
       this.send({ kind: 'gather', units: ids, target: target.id });
       this.ui.ping = { pos: target.pos, age: 0, kind: 'move' };

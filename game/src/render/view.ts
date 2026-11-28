@@ -1,6 +1,6 @@
 // Vista del juego: mantiene un objeto 3D por entidad de la simulación y lo interpola entre ticks.
 import * as THREE from 'three';
-import { MODULES, UNITS } from '../sim/defs';
+import { MODULES, PLANET, UNITS } from '../sim/defs';
 import { hexToWorld } from '../sim/hex';
 import { coreOf, dist } from '../sim/sim';
 import type { Asteroid, AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
@@ -116,6 +116,17 @@ export class GameView {
           break;
         }
         case 'anomaly': this.fx.pulse(ev.pos, -1, 60); this.fx.pulse(ev.pos, -1, 30); break;
+        case 'planetDestroyed': {
+          this.fx.planetBurst(ev.pos, ev.radius, PLANET.blast.reach + ev.radius);
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            this.fx.explosion({ x: ev.pos.x + Math.cos(a) * ev.radius * 0.6, z: ev.pos.z + Math.sin(a) * ev.radius * 0.6 }, 9, -1, 6);
+          }
+          // tiembla más cuanto más cerca está la cámara
+          const d = Math.hypot(this.space.rig.target.x - ev.pos.x, this.space.rig.target.z - ev.pos.z);
+          this.space.rig.shake(Math.max(0.35, 1.1 - d / 400));
+          break;
+        }
         case 'captured': {
           const p = s.entities.get(ev.planet);
           if (p) this.fx.pulse(p.pos, ev.side, 50);
@@ -233,6 +244,11 @@ export class GameView {
       } else if (e.kind === 'planet' && v.planet) {
         v.model.children[0].rotation.y += dt * 0.05;
         v.planet.material.uniforms.uTime.value = t;
+        const dmg = 1 - e.hp / e.maxHp;
+        v.planet.material.uniforms.uDamage.value = dmg;
+        // al borde de romperse, el planeta tiembla
+        const quake = dmg > 0.7 ? (dmg - 0.7) * 1.6 : 0;
+        v.model.position.set(Math.sin(t * 37) * quake, Math.sin(t * 23) * quake * 0.6, Math.cos(t * 31) * quake);
         const ownerCol = e.owner === -1 ? new THREE.Color(0x222233) : SIDE_COLORS[e.owner];
         (v.planet.material.uniforms.uOwner.value as THREE.Color).copy(ownerCol);
         const capSide = e.capture > 0 ? 0 : 1;

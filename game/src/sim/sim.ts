@@ -157,7 +157,8 @@ export function createSim(seed = 1): SimState {
     [{ x: -60, z: 265 }, 12], [{ x: 60, z: -265 }, 12],
   ];
   planetPos.forEach(([pos, radius], i) => {
-    const p: Planet = { id: s.nextId++, kind: 'planet', name: PLANET_NAMES[i], pos, radius, owner: -1, capture: 0 };
+    const hp = Math.round(radius * PLANET.hpPerRadius);
+    const p: Planet = { id: s.nextId++, kind: 'planet', name: PLANET_NAMES[i], pos, radius, owner: -1, capture: 0, hp, maxHp: hp, lastAttacker: -1 };
     s.entities.set(p.id, p);
   });
 
@@ -175,12 +176,13 @@ function mkPlayer(side: Side): Player {
   return { side, res: { ...START_RES }, era: 1, alive: true, beaconLedgers: 0, lastHit: -1, gatherMult: 1, holdFire: false, maxDrones: 32 };
 }
 
-function addAsteroid(s: SimState, res: AsteroidKind, pos: Vec, rng: Rng) {
+function addAsteroid(s: SimState, res: AsteroidKind, pos: Vec, rng: Rng): Asteroid {
   const a: Asteroid = {
     id: s.nextId++, kind: 'asteroid', res, pos: { ...pos },
     amount: DEPOSITS[res].amount, radius: res === 'energy' ? rng.range(2.2, 3.2) : rng.range(2.6, 4.2),
   };
   s.entities.set(a.id, a);
+  return a;
 }
 
 // ---------- colocación de módulos ----------
@@ -294,8 +296,10 @@ export function applyCommand(s: SimState, side: Side, cmd: Command) {
     }
     case 'attack': {
       const t = s.entities.get(cmd.target);
-      if (!t || (t.kind !== 'unit' && t.kind !== 'module') || t.side === side) return;
-      for (const u of ownedUnits(s, side, cmd.units)) u.order = { kind: 'attack', target: t.id };
+      if (!t) return;
+      // un planeta neutral o rival se puede bombardear; los tuyos no
+      if (t.kind === 'planet' ? t.owner === side : (t.kind !== 'unit' && t.kind !== 'module') || t.side === side) return;
+      for (const u of ownedUnits(s, side, cmd.units)) if (UNITS[u.type].cls !== 'worker' || t.kind !== 'planet') u.order = { kind: 'attack', target: t.id };
       break;
     }
     case 'gather': {
@@ -447,6 +451,34 @@ function spawnAnomaly(s: SimState) {
   s.rngState = rng.state;
 }
 
+/**
+ * Un planeta roto: botín inmediato para quien lo rompió, onda expansiva que daña lo que haya cerca (de los dos
+ * bandos) y un campo de escombros con más recursos de lo normal. El dueño pierde su renta.
+ */
+function shatterPlanet(s: SimState, p: Planet) {
+  s.entities.delete(p.id);
+  const rng = new Rng(s.rngState || s.seed || 1);
+  const L = PLANET.loot, r = p.radius;
+  const loot: Res = { lumens: Math.round(L.lumens * r), metal: Math.round(L.metal * r), energy: Math.round(L.energy * r) };
+  if (p.lastAttacker !== -1) refund(s.players[p.lastAttacker].res, loot);
+  const reach = r + PLANET.blast.reach;
+  for (const e of s.entities.values()) {
+    if (e.kind !== 'unit' && e.kind !== 'module') continue;
+    const d = dist(e.pos, p.pos);
+    if (d < reach) e.hp -= PLANET.blast.damage * (1 - d / reach) * (e.kind === 'module' ? 0.5 : 1);
+  }
+  const kinds: AsteroidKind[] = ['lumen', 'metal', 'energy'];
+  const n = Math.round(r * PLANET.debris.perRadius);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rng.range(-0.3, 0.3), d = rng.range(r * 0.3, r * 1.5);
+    const res = kinds[i % 3];
+    const rock = addAsteroid(s, res, { x: p.pos.x + Math.cos(a) * d, z: p.pos.z + Math.sin(a) * d }, rng);
+    rock.amount = Math.round(rock.amount * PLANET.debris.richness);
+  }
+  s.rngState = rng.state;
+  s.events.push({ kind: 'planetDestroyed', pos: { ...p.pos }, radius: r, name: p.name, side: p.lastAttacker, loot });
+}
+
 function reap(s: SimState) {
   for (const e of [...s.entities.values()]) {
     if (e.kind === 'unit' || e.kind === 'module') {
@@ -459,6 +491,8 @@ function reap(s: SimState) {
       }
     } else if (e.kind === 'asteroid' && e.amount <= 0) {
       s.entities.delete(e.id);
+    } else if (e.kind === 'planet' && e.hp <= 0) {
+      shatterPlanet(s, e);
     }
   }
 }
@@ -622,7 +656,7 @@ function stepUnit(s: SimState, u: Unit) {
     }
     case 'attack': {
       const t = s.entities.get(o.target);
-      if (!t || (t.kind !== 'unit' && t.kind !== 'module') || t.hp <= 0) { u.order = { kind: 'idle' }; break; }
+      if (!t || (t.kind !== 'unit' && t.kind !== 'module' && t.kind !== 'planet') || t.hp <= 0) { u.order = { kind: 'idle' }; break; }
       const reach = d.range + radiusOf(t) + d.radius * 0.5;
       if (dist(u.pos, t.pos) > reach) { moveTowards(u, t.pos, reach - 0.5); break; }
       face(u, t.pos);
@@ -666,8 +700,17 @@ function afterBuild(s: SimState, u: Unit, m: Module) {
   u.order = { kind: 'idle' };
 }
 
-function attackStep(s: SimState, u: Unit, t: Unit | Module) {
+function attackStep(s: SimState, u: Unit, t: Unit | Module | Planet) {
   const d = UNITS[u.type];
+  if (t.kind === 'planet') {
+    // bombardeo planetario: cuenta como daño a estructuras
+    t.hp -= d.damage * d.vsModule;
+    t.lastAttacker = u.side;
+    if (t.owner !== -1 && t.owner !== u.side) s.players[t.owner].lastHit = s.tick;
+    s.events.push({ kind: 'shot', from: { ...u.pos }, to: { ...t.pos }, side: u.side, weapon: d.weapon });
+    u.cooldown = d.cooldown;
+    return;
+  }
   const dmg = d.damage * damageMult(d.vsShip, d.vsModule, t);
   fire(s, u.pos, u.side, t, dmg, d.weapon);
   u.cooldown = d.cooldown;

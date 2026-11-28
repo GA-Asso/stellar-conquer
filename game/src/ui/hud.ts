@@ -178,6 +178,10 @@ export class Hud {
       } else if (ev.kind === 'anomaly') {
         // las anomalías llegan en pareja (campo y espejo): un solo aviso
         if (ev === s.events.find(x => x.kind === 'anomaly')) this.toast(`Anomalía detectada: apareció un campo de ${DEPOSITS[ev.res].short} en zona neutral (mira el minimapa)`, 'good');
+      } else if (ev.kind === 'planetDestroyed') {
+        const loot = `+${ev.loot.lumens} Lumens, +${ev.loot.metal} metal, +${ev.loot.energy} energía`;
+        this.toast(ev.side === this.side ? `¡Rompiste ${ev.name}! Botín: ${loot}. Sus escombros son ricos en recursos`
+          : ev.side === -1 ? `${ev.name} se ha roto` : `El rival rompió ${ev.name} y se llevó su botín`, ev.side === this.side ? 'good' : 'bad');
       } else if (ev.kind === 'captured') {
         const p = s.entities.get(ev.planet);
         const name = p && p.kind === 'planet' ? p.name : 'un planeta';
@@ -250,8 +254,8 @@ export class Hud {
           : e.order.kind === 'build' ? 'Ensamblando' : e.order.kind === 'attack' ? 'Atacando' : e.order.kind === 'move' ? 'En ruta' : 'En espera';
         const hint = e.side !== this.side ? 'Unidad enemiga: selecciona tus tropas y haz clic derecho sobre ella para atacarla.'
           : e.type === 'drone' ? 'Clic derecho en un asteroide para minar · elige un módulo a la derecha para construir · clic derecho en un módulo dañado para repararlo.'
-          : UNITS[e.type].cls === 'robot' ? 'Clic derecho sobre un planeta para conquistarlo, o sobre un enemigo para atacarlo.'
-          : 'Clic derecho sobre un enemigo para atacar · Ctrl+clic derecho para avanzar atacando.';
+          : UNITS[e.type].cls === 'robot' ? 'Clic derecho sobre un planeta para conquistarlo (Ctrl para bombardearlo), o sobre un enemigo para atacarlo.'
+          : 'Clic derecho sobre un enemigo o un planeta ajeno para atacarlo · Ctrl+clic derecho para avanzar atacando.';
         html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, `
           <div class="stats"><span>ATQ<b>${d.damage}</b></span><span>ALC<b>${d.range}</b></span><span>VEL<b>${d.speed}</b></span><span class="task">${task}</span></div>`, hint, UNIT_GLYPH[e.type]);
       } else if (e.kind === 'module') {
@@ -282,7 +286,7 @@ export class Hud {
           'Selecciona drones y haz clic derecho sobre él para minarlo.');
       } else {
         const owner = e.owner === -1 ? 'Neutral' : e.owner === this.side ? 'Tuyo' : 'Del rival';
-        html = this.card(`Planeta ${e.name}`, `${owner}. Lleva robots (Mecha o Titán) a su órbita para conquistarlo: paga Lumens cada ledger.`, 0, 0, e.owner, `
+        html = this.card(`Planeta ${e.name}`, `${owner}. Conquístalo con robots en su órbita (paga Lumens cada ledger) o bombardéalo: al romperse da botín y deja escombros ricos.`, e.hp, e.maxHp, e.owner, `
           <div class="progress cap"><i style="width:${Math.abs(e.capture) * 100}%; background:${e.capture >= 0 ? 'var(--ally)' : 'var(--enemy)'}"></i><span>Control ${Math.round(Math.abs(e.capture) * 100)} %</span></div>`);
       }
     } else {
@@ -382,7 +386,14 @@ export class Hud {
       cls = e.res;
     } else if (e.kind === 'planet') {
       name = `Planeta ${e.name}` + (e.owner === this.side ? ' (tuyo)' : e.owner === -1 ? ' (neutral)' : ' (rival)');
-      act = 'Conquístalo con robots en su órbita';
+      const hasRobots = this.input.selectedUnits().some(u => UNITS[u.type].cls === 'robot');
+      const pct = Math.ceil((e.hp / e.maxHp) * 100);
+      name += pct < 100 ? ` · ${pct} % de integridad` : '';
+      act = e.owner === this.side ? 'Te paga Lumens cada ledger'
+        : !hasArmy ? 'Conquístalo con robots o bombardéalo hasta romperlo'
+        : hasRobots ? 'Clic derecho: conquistar · Ctrl + clic derecho: bombardear'
+        : 'Clic derecho: bombardear (al romperse suelta botín y escombros ricos)';
+      cls = e.owner === this.side ? 'ally' : e.owner === -1 ? '' : 'enemy';
     } else if (e.kind === 'unit') {
       name = UNITS[e.type].name;
       cls = e.side === this.side ? 'ally' : 'enemy';
