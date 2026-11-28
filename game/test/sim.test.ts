@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LEDGER_TICKS, MODULES, PLANET, TICK_HZ } from '../src/sim/defs';
-import { hexNeighbors, hexToWorld, worldToHex } from '../src/sim/hex';
+import { hexDist, hexNeighbors, hexToWorld, worldToHex } from '../src/sim/hex';
 import { asteroids, canPlace, coreOf, createSim, dist, freePorts, planets, popCap, step, units } from '../src/sim/sim';
 import type { SimState } from '../src/sim/types';
 
@@ -42,7 +42,9 @@ describe('estación modular', () => {
     expect(canPlace(s, 0, 'habitat', far).ok).toBe(false);
     const ports = freePorts(s, 0, 'habitat');
     expect(ports.length).toBeGreaterThan(0);
-    expect(hexNeighbors(core.hex).some(n => n.q === ports[0].q && n.r === ports[0].r)).toBe(true);
+    // el Núcleo ocupa su celda y las 6 vecinas: los módulos se acoplan al anillo siguiente
+    expect(ports.every(p => hexDist(core.hex, p) === 2)).toBe(true);
+    expect(canPlace(s, 0, 'habitat', hexNeighbors(core.hex)[0]).ok).toBe(false);
   });
 
   it('los drones ensamblan un hábitat y sube la población', () => {

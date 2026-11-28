@@ -144,14 +144,14 @@ export class GameView {
       root.add(b.group);
       const r = MODULES[e.type].radius;
       const cage = new THREE.Mesh(
-        new THREE.CylinderGeometry(r, r, 14, 6, 4, true).rotateY(Math.PI / 6).translate(0, 7, 0),
+        new THREE.CylinderGeometry(r, r, 14, e.type === 'core' ? 24 : 6, 4, true).rotateY(Math.PI / 6).translate(0, 7, 0),
         new THREE.MeshBasicMaterial({ color: SIDE_COLORS[e.side].clone().multiplyScalar(1.8), wireframe: true, transparent: true, opacity: 0.6 }),
       );
       root.add(cage);
       // ícono flotante para reconocer cada módulo de un vistazo
       const icon = iconSprite(MODULE_GLYPH[e.type], '#' + SIDE_COLORS[e.side].getHexString());
-      icon.position.y = e.type === 'beacon' ? 40 : e.type === 'core' ? 27 : 20;
-      icon.scale.setScalar(e.type === 'core' ? 0.044 : 0.034);
+      icon.position.y = e.type === 'beacon' ? 40 : e.type === 'core' ? 50 : 20;
+      icon.scale.setScalar(e.type === 'core' ? 0.06 : 0.034);
       root.add(icon);
       v = { root, model: b.group, spins: b.spins, tick: b.tick, cage, phase: 0 };
     } else if (e.kind === 'asteroid') {
@@ -310,9 +310,14 @@ export class GameView {
   private addConnector(s: SimState, id: number, parentId: number) {
     const a = s.entities.get(id), b = s.entities.get(parentId);
     if (!a || !b || a.kind !== 'module' || b.kind !== 'module') return;
-    const len = dist(a.pos, b.pos);
+    // hacia la ciudadela el pasillo termina en su muralla, no en el centro de la torre
+    const full = dist(a.pos, b.pos);
+    const cut = b.type === 'core' ? Math.min(full - 4, MODULES.core.radius - 1) : 0;
+    const k = cut / Math.max(1e-6, full);
+    const end = { x: b.pos.x + (a.pos.x - b.pos.x) * k, z: b.pos.z + (a.pos.z - b.pos.z) * k };
+    const len = full - cut;
     const c = buildConnector(a.side, len);
-    c.position.set((a.pos.x + b.pos.x) / 2, 0, (a.pos.z + b.pos.z) / 2);
+    c.position.set((a.pos.x + end.x) / 2, 0, (a.pos.z + end.z) / 2);
     c.rotation.y = -Math.atan2(b.pos.z - a.pos.z, b.pos.x - a.pos.x);
     this.space.scene.add(c);
     this.connectors.set(id, c);

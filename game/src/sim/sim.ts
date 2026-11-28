@@ -155,7 +155,7 @@ export function createSim(seed = 1): SimState {
   for (const [side, core] of [[0, core0], [1, core1]] as [Side, Module][]) {
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + 0.4;
-      addUnit(s, 'drone', side, { x: core.pos.x + Math.cos(a) * 14, z: core.pos.z + Math.sin(a) * 14 });
+      addUnit(s, 'drone', side, { x: core.pos.x + Math.cos(a) * 30, z: core.pos.z + Math.sin(a) * 30 });
     }
   }
   s.rngState = rng.state;
@@ -176,6 +176,11 @@ function addAsteroid(s: SimState, res: AsteroidKind, pos: Vec, rng: Rng) {
 
 // ---------- colocación de módulos ----------
 
+/** celdas que ocupa un módulo: el Núcleo es una ciudadela de 7 celdas (la suya y sus 6 vecinas) */
+export function footprint(m: Pick<Module, 'type' | 'hex'>): Hex[] {
+  return m.type === 'core' ? [m.hex, ...hexNeighbors(m.hex)] : [m.hex];
+}
+
 export type PlaceCheck = { ok: true; parent: number | null } | { ok: false; reason: string };
 
 export function canPlace(s: SimState, side: Side, type: ModuleType, hex: Hex): PlaceCheck {
@@ -188,7 +193,7 @@ export function canPlace(s: SimState, side: Side, type: ModuleType, hex: Hex): P
   if (Math.abs(pos.x) > MAP_HALF - 10 || Math.abs(pos.z) > MAP_HALF - 10) return { ok: false, reason: 'Fuera del mapa' };
 
   const occupied = new Map<string, Module>();
-  for (const m of modules(s)) occupied.set(hexKey(m.hex), m);
+  for (const m of modules(s)) for (const h of footprint(m)) occupied.set(hexKey(h), m);
   if (occupied.has(hexKey(hex))) return { ok: false, reason: 'Celda ocupada' };
   for (const e of s.entities.values()) {
     if (e.kind === 'asteroid' && dist(e.pos, pos) < e.radius + 11) return { ok: false, reason: 'Hay asteroides' };
@@ -214,7 +219,7 @@ export function freePorts(s: SimState, side: Side, type: ModuleType): Hex[] {
   const seen = new Set<string>();
   const out: Hex[] = [];
   for (const m of modules(s, side)) {
-    for (const n of hexNeighbors(m.hex)) {
+    for (const n of footprint(m).flatMap(hexNeighbors)) {
       const k = hexKey(n);
       if (seen.has(k)) continue;
       seen.add(k);
@@ -533,12 +538,13 @@ function nearestAsteroid(s: SimState, res: AsteroidKind | null, pos: Vec, maxD: 
   return best;
 }
 
-// la mayor protección de escudo que cubre una posición (los escudos no se suman)
-function shieldAt(s: SimState, side: Side, pos: Vec): number {
+// la mayor protección de escudo que alcanza a un objetivo (los escudos no se suman); cuenta su tamaño, así
+// la cúpula cubre la ciudadela aunque su centro quede lejos
+function shieldAt(s: SimState, side: Side, pos: Vec, size = 0): number {
   let best = 0;
   for (const m of modules(s, side)) {
     const sh = MODULES[m.type].shield;
-    if (!sh || m.built < 1 || dist(m.pos, pos) > sh.radius) continue;
+    if (!sh || m.built < 1 || dist(m.pos, pos) - size > sh.radius) continue;
     best = Math.max(best, sh.reduction);
   }
   return best;
@@ -552,7 +558,7 @@ function globalBonus(s: SimState, side: Side, key: 'gatherBonus' | 'trainSpeed')
 }
 
 function fire(s: SimState, from: Vec, side: Side, target: Unit | Module, damage: number, weapon: 'laser' | 'plasma' | 'melee') {
-  target.hp -= damage * (1 - shieldAt(s, target.side, target.pos));
+  target.hp -= damage * (1 - shieldAt(s, target.side, target.pos, radiusOf(target)));
   if (target.side !== side) s.players[target.side].lastHit = s.tick;
   s.events.push({ kind: 'shot', from: { ...from }, to: { ...target.pos }, side, weapon });
 }

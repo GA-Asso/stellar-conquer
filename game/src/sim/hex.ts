@@ -1,7 +1,8 @@
 // Grilla hexagonal (axial, puntas arriba) donde se acoplan los módulos de la estación.
 import type { Hex, Vec } from './types';
 
-export const HEX_SIZE = 10;
+// 13 deja un pasillo visible entre módulos vecinos (radio máximo 9): ya no se enciman
+export const HEX_SIZE = 13;
 const SQRT3 = Math.sqrt(3);
 
 export const HEX_DIRS: Hex[] = [

@@ -102,8 +102,9 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
   core: {
     name: 'Núcleo Estelar', desc: 'Corazón de la estación. Si cae, pierdes.',
     cost: cost(), hp: 3200, buildTime: 1, era: 1, pop: 6, energy: 0.3, trains: ['drone'],
-    dropsite: true, freePlacement: false, attack: { damage: 6, range: 30, cooldown: 1.2, weapon: 'laser' },
-    sight: 70, radius: 9, hotkey: '',
+    dropsite: true, freePlacement: false, attack: { damage: 6, range: 44, cooldown: 1.2, weapon: 'laser' },
+    // ocupa su celda y las 6 vecinas (ver footprint en sim.ts): es la ciudadela, no un módulo más
+    sight: 90, radius: 22, hotkey: '',
   },
   habitat: {
     name: 'Hábitat', desc: '+8 de población.', cost: cost(0, 50), hp: 520, buildTime: 14, era: 1, pop: 8, energy: 0,

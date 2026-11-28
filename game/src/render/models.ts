@@ -109,28 +109,63 @@ export function buildModule(type: ModuleType, side: Owner): ModuleModel {
   let tick: ((t: number) => void) | undefined;
   switch (type) {
     case 'core': {
-      g.add(hexBase(m, 9));
-      // torre escalonada: tambor oscuro, anillo de ventanas, cuerpo blanco y esfera
-      g.add(at(cyl(6.2, 7, 2.4, m.dark, 24), 0, 2.4, 0));
-      g.add(at(cyl(5.2, 6, 1, m.windows, 24), 0, 4.1, 0));
-      g.add(at(cyl(4.2, 5.2, 4, m.hull, 24), 0, 6.6, 0));
-      g.add(at(sphere(4.2, m.hull), 0, 10.4, 0));
-      g.add(flat(at(torus(4.25, 0.18, m.trim, 40), 0, 10.4, 0)));
-      // brazos de atraque con balizas
-      for (let i = 0; i < 3; i++) {
-        const a = (i / 3) * Math.PI * 2 + 0.5;
-        const arm = box(7, 0.8, 1, m.hull);
-        arm.position.set(Math.cos(a) * 7, 4.6, Math.sin(a) * 7);
-        arm.rotation.y = -a;
-        g.add(arm);
-        g.add(at(sphere(0.55, m.glow, 8, 6), Math.cos(a) * 10.4, 4.6, Math.sin(a) * 10.4));
+      // Ciudadela: ocupa 7 celdas y se ve desde lejos. Plaza circular con anillo de muralla, seis pilones,
+      // torre escalonada alta y un haz de luz vertical del color del jugador: es el centro de la base
+      const plaza = cyl(23, 24.5, 1.4, m.dark, 48);
+      g.add(at(plaza, 0, 0.7, 0));
+      g.add(at(cyl(21, 21, 0.25, m.deck, 48), 0, 1.45, 0));
+      g.add(flat(at(torus(23.2, 0.45, m.trim, 96), 0, 1.5, 0)));
+      g.add(flat(at(torus(15, 0.2, m.glow, 72), 0, 1.6, 0)));
+      // muralla baja segmentada con huecos en las seis salidas de los pasillos
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+        const wall = new THREE.Mesh(new THREE.TorusGeometry(21.5, 0.9, 6, 12, Math.PI / 3 - 0.32), m.hull);
+        wall.rotation.x = Math.PI / 2;
+        wall.rotation.z = a + 0.16;
+        wall.position.y = 2.2;
+        g.add(wall);
+        // pilón con luz en cada salida
+        const pa = a + Math.PI / 6;
+        const px = Math.cos(pa) * 19, pz = Math.sin(pa) * 19;
+        g.add(at(box(1.6, 9, 1.6, m.gunmetal), px, 4.5, pz));
+        g.add(at(sphere(0.9, m.glow, 10, 8), px, 9.6, pz));
       }
-      // logo de Stellar flotando y girando sobre el núcleo
-      const emblemPivot = at(new THREE.Group(), 0, 19, 0);
-      emblemPivot.add(stellarEmblem(m, 4));
+      // torre: zócalo ancho, anillo de ventanas, cuerpo blanco, segundo anillo y cúpula
+      g.add(at(cyl(10, 12, 4, m.dark, 32), 0, 3.5, 0));
+      g.add(at(cyl(9.2, 9.6, 1.4, m.windows, 32), 0, 6.2, 0));
+      g.add(at(cyl(7.2, 9, 9, m.hull, 32), 0, 11.6, 0));
+      g.add(at(cyl(7.6, 7.6, 1, m.windows, 32), 0, 16.6, 0));
+      g.add(at(cyl(5.2, 7, 5, m.hull, 32), 0, 19.6, 0));
+      g.add(at(sphere(5.4, m.glass, 32, 20), 0, 22.4, 0));
+      g.add(flat(at(torus(7.6, 0.35, m.trim, 48), 0, 17.2, 0)));
+      // contrafuertes que unen la torre con la plaza
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const fin = box(7, 7, 0.9, m.plating);
+        fin.position.set(Math.cos(a) * 11.5, 4.5, Math.sin(a) * 11.5);
+        fin.rotation.y = -a;
+        g.add(fin);
+      }
+      // antena y haz vertical: la ciudadela se encuentra aunque la base crezca alrededor
+      g.add(at(cyl(0.35, 0.5, 10, m.gunmetal, 8), 0, 31, 0));
+      const beam = cyl(1.1, 1.8, 90, m.exhaust, 16);
+      g.add(at(beam, 0, 70, 0));
+      // logo de Stellar flotando y girando sobre la torre
+      const emblemPivot = at(new THREE.Group(), 0, 40, 0);
+      emblemPivot.add(stellarEmblem(m, 6));
       g.add(emblemPivot);
       spins.push({ obj: emblemPivot, axis: 'y', speed: 0.6 });
-      g.add(at(cyl(0.25, 0.25, 4, m.hull, 6), 0, 15.5, 0));
+      // anillo orbital lento alrededor de la torre
+      const orbit = at(new THREE.Group(), 0, 26, 0);
+      const ring = flat(torus(12, 0.25, m.glow, 96));
+      orbit.add(ring);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        orbit.add(at(box(1.6, 0.6, 1.6, m.hull), Math.cos(a) * 12, 0, Math.sin(a) * 12));
+      }
+      orbit.rotation.z = 0.12;
+      g.add(orbit);
+      spins.push({ obj: orbit, axis: 'y', speed: -0.25 });
       break;
     }
     case 'habitat': {
