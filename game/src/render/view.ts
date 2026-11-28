@@ -12,6 +12,7 @@ import { Scenery } from './scenery';
 import { BlackHoles } from './blackhole';
 import { Wormholes } from './wormhole';
 import { Nebulae } from './nebula';
+import { CometView } from './comet';
 
 const CARGO_COLORS: Record<AsteroidKind, THREE.Color> = {
   lumen: new THREE.Color(2.2, 1.8, 0.3),
@@ -53,6 +54,7 @@ export class GameView {
   private holes: BlackHoles | null = null;
   private worms: Wormholes | null = null;
   private nebulae: Nebulae | null = null;
+  private comet: CometView | null = null;
   private views = new Map<number, View>();
   private connectors = new Map<number, THREE.Group>();
   private prev = new Map<number, Vec>();
@@ -207,6 +209,8 @@ export class GameView {
     this.worms.update(t, dt);
     this.nebulae ??= new Nebulae(this.space.scene, s.nebulae);
     this.nebulae.update(t);
+    this.comet ??= new CometView(this.space.scene);
+    this.comet.update(s, alpha, dt);
     const rocks: Asteroid[] = [];
     for (const e of s.entities.values()) if (e.kind === 'asteroid') rocks.push(e);
     const alive = new Set<number>();
@@ -409,6 +413,7 @@ export class GameView {
     this.holes?.dispose();
     this.worms?.dispose();
     this.nebulae?.dispose();
+    this.comet?.dispose();
   }
 
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado

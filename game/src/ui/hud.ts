@@ -1,7 +1,7 @@
 // HUD: recursos, ledger, panel de selección, botonera de órdenes, minimapa y avisos.
 import { Vector3 } from 'three';
 import { DEPOSITS, ERA_UP, ERAS, LEDGER_TICKS, MAP_HALF, MODULES, TICK_HZ, UNITS } from '../sim/defs';
-import { canAfford, coreOf, hasBuilt, hiddenFrom, popCap, popUsed } from '../sim/sim';
+import { canAfford, cometHead, coreOf, hasBuilt, hiddenFrom, popCap, popUsed } from '../sim/sim';
 import type { Command, Entity, Module, ModuleType, Res, Side, SimState, Unit, UnitType } from '../sim/types';
 import type { GameView } from '../render/view';
 import type { SpaceScene } from '../render/scene';
@@ -109,6 +109,7 @@ export class Hud {
           <dt>Espacio</dt><dd>Volver al Núcleo · <b>.</b> busca un dron ocioso · <b>,</b> todo el ejército</dd>
           <dt>Ctrl + 1…9</dt><dd>Guardar grupo · Shift + número lo amplía · 1…9 lo recupera (dos veces: centra la cámara)</dd>
           <dt>P · + / −</dt><dd>Pausa · velocidad del juego (×0,5 a ×2)</dd>
+          <dt>El mapa</dt><dd><b>Agujero negro</b>: frena a quien lo cruza · <b>Agujero de gusano</b>: manda tropas a una boca y salen por la del mismo color · <b>Nebulosa</b>: dentro no te ven desde lejos · <b>Cometa</b>: aparta tus tropas de la franja; deja cristales · <b>Planeta</b>: conquístalo o bombardéalo para romperlo</dd>
         </dl>
       </details>
       <div class="tip" id="tip"></div>
@@ -179,6 +180,9 @@ export class Hud {
       } else if (ev.kind === 'anomaly') {
         // las anomalías llegan en pareja (campo y espejo): un solo aviso
         if (ev === s.events.find(x => x.kind === 'anomaly')) this.toast(`Anomalía detectada: apareció un campo de ${DEPOSITS[ev.res].short} en zona neutral (mira el minimapa)`, 'good');
+      } else if (ev.kind === 'comet') {
+        this.toast(ev.phase === 'warn' ? '¡Cometa a la vista! Aparta tus tropas de la franja marcada: daña lo que toca'
+          : 'El cometa dejó cristales de energía helada en su estela (mira el minimapa)', ev.phase === 'warn' ? 'bad' : 'good');
       } else if (ev.kind === 'planetDestroyed') {
         const loot = `+${ev.loot.lumens} Lumens, +${ev.loot.metal} metal, +${ev.loot.energy} energía`;
         this.toast(ev.side === this.side ? `¡Rompiste ${ev.name}! Botín: ${loot}. Sus escombros son ricos en recursos`
@@ -452,6 +456,14 @@ export class Hud {
     c.fillStyle = grad;
     c.fillRect(0, 0, W, W);
 
+    // cometa: su trayectoria (aviso) y la cabeza mientras cruza
+    if (s.comet) {
+      const a = this.toMini(s.comet.from.x, s.comet.from.z), b = this.toMini(s.comet.to.x, s.comet.to.z);
+      c.strokeStyle = 'rgba(170,230,255,0.55)'; c.setLineDash([5, 5]); c.lineWidth = 2;
+      c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); c.setLineDash([]); c.lineWidth = 1;
+      const h = cometHead(s.comet, s.tick);
+      if (h) { const p = this.toMini(h.x, h.z); c.fillStyle = '#e8fbff'; c.beginPath(); c.arc(p.x, p.y, 5, 0, Math.PI * 2); c.fill(); }
+    }
     // nebulosas: nubes azules donde el rival puede esconderse
     for (const n of s.nebulae) {
       const p = this.toMini(n.pos.x, n.pos.z), r = n.radius * k;

@@ -137,9 +137,16 @@ describe('anomalías', () => {
     const s = createSim(31);
     const n0 = asteroids(s).length;
     let events = 0;
-    for (let t = 0; t < 36 * LEDGER_TICKS; t++) { step(s); events += s.events.filter(e => e.kind === 'anomaly').length; }
+    // los cometas también dejan cristales: se descuentan para contar solo los de la anomalía
+    let fromComets = 0;
+    for (let t = 0; t < 36 * LEDGER_TICKS; t++) {
+      const before = asteroids(s).length;
+      step(s);
+      events += s.events.filter(e => e.kind === 'anomaly').length;
+      if (s.events.some(e => e.kind === 'comet' && e.phase === 'drop')) fromComets += asteroids(s).length - before;
+    }
     expect(events).toBe(2);
-    expect(asteroids(s).length).toBe(n0 + 10);
+    expect(asteroids(s).length - fromComets).toBe(n0 + 10);
   });
 });
 
@@ -240,5 +247,25 @@ describe('nebulosas iónicas', () => {
     far.pos = { x: n.pos.x + 8, z: n.pos.z };
     for (let i = 0; i < 60; i++) step(s);
     expect(hidden.hp).toBeLessThan(hidden.maxHp);
+  });
+});
+
+describe('cometas', () => {
+  it('avisa, cruza el mapa dañando lo que toca y deja cristales en espejo', async () => {
+    const { COMET } = await import('../src/sim/defs');
+    const s = createSim(12);
+    s.ledger = COMET.offsetLedgers - 1;
+    s.tick = LEDGER_TICKS - 1;
+    step(s);
+    expect(s.comet).not.toBeNull();
+    expect(s.events.some(e => e.kind === 'comet' && e.phase === 'warn')).toBe(true);
+    const crystals0 = asteroids(s).filter(a => a.res === 'energy').length;
+    for (let i = 0; i < COMET.warnTicks + COMET.flightTicks + 2; i++) step(s);
+    expect(s.comet).toBeNull();
+    const crystals = asteroids(s).filter(a => a.res === 'energy');
+    expect(crystals.length).toBeGreaterThan(crystals0);
+    // simetría: cada cristal nuevo tiene su espejo
+    const fresh = crystals.slice(crystals0);
+    for (const c of fresh) expect(fresh.some(o => Math.abs(o.pos.x + c.pos.x) < 1e-6 && Math.abs(o.pos.z + c.pos.z) < 1e-6)).toBe(true);
   });
 });

@@ -233,4 +233,10 @@ export const WORMHOLES = { radius: 16, cooldownTicks: 60, pairs: [{ a: { x: -345
  */
 export const NEBULAE = { sight: 20, spots: [{ x: 80, z: 130, r: 46 }, { x: -300, z: -60, r: 40 }] };
 
+/**
+ * Cometas: cada `everyLedgers` uno cruza el mapa en línea recta por el centro (así sus restos caen en espejo).
+ * Avisa unos segundos antes, daña lo que toque y deja cristales de energía helada a lo largo de su estela.
+ */
+export const COMET = { everyLedgers: 20, offsetLedgers: 8, warnTicks: 80, flightTicks: 150, reach: 9, damagePerTick: 10, drops: [0.28, 0.4], rocks: 3, richness: 1.4 };
+
 export const BLACK_HOLES = { minSpeed: 0.3, spots: [{ x: 150, z: 240, r: 38 }, { x: -215, z: 20, r: 34 }] };

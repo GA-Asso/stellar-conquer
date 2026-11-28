@@ -1,11 +1,11 @@
 // Motor de la simulación: un paso fijo a 20 Hz. Recibe comandos y avanza el estado.
 import {
-  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, DEPOSITS, NEBULAE, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
+  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, COMET, DEPOSITS, NEBULAE, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
 } from './defs';
 import { hexDist, hexKey, hexNeighbors, hexToWorld, worldToHex } from './hex';
 import { Rng } from './rng';
 import type {
-  Asteroid, AsteroidKind, BlackHole, Command, Entity, Era, Hex, Module, ModuleType, Owner, Planet, Player, Res, Side, SimState,
+  Asteroid, AsteroidKind, BlackHole, Comet, Command, Entity, Era, Hex, Module, ModuleType, Owner, Planet, Player, Res, Side, SimState,
   Unit, UnitType, Vec,
 } from './types';
 
@@ -97,6 +97,7 @@ export function createSim(seed = 1): SimState {
   const s: SimState = {
     tick: 0, ledger: 0, seed, rngState: 0, nextId: 1, entities: new Map(),
     players: [mkPlayer(0), mkPlayer(1)], events: [], winner: null, winReason: '', holes: [], wormholes: WORMHOLES.pairs.map(p => ({ a: { ...p.a }, b: { ...p.b }, radius: WORMHOLES.radius })),
+    comet: null,
     nebulae: NEBULAE.spots.flatMap(n => [{ pos: { x: n.x, z: n.z }, radius: n.r }, { pos: { x: -n.x, z: -n.z }, radius: n.r }]),
   };
 
@@ -399,6 +400,7 @@ export function step(s: SimState, cmds: SideCommand[] = []) {
   }
   separate(s);
   stepWormholes(s);
+  stepComet(s);
   stepPlanets(s);
   stepEnergy(s);
   reap(s);
@@ -432,6 +434,53 @@ function stepWormholes(s: SimState) {
   }
 }
 
+function launchComet(s: SimState) {
+  const rng = new Rng(s.rngState || s.seed || 1);
+  const a = rng.range(0, Math.PI * 2), R = MAP_HALF + 90;
+  const from = { x: Math.cos(a) * R, z: Math.sin(a) * R };
+  const warn = s.tick, start = s.tick + COMET.warnTicks;
+  s.comet = { from, to: { x: -from.x, z: -from.z }, warn, start, end: start + COMET.flightTicks };
+  s.rngState = rng.state;
+  s.events.push({ kind: 'comet', phase: 'warn', from: { ...from }, to: { x: -from.x, z: -from.z } });
+}
+
+/** posición de la cabeza del cometa (null si aún no vuela o ya pasó) */
+export function cometHead(c: Comet, tick: number): Vec | null {
+  if (tick < c.start || tick > c.end) return null;
+  const t = (tick - c.start) / (c.end - c.start);
+  return { x: c.from.x + (c.to.x - c.from.x) * t, z: c.from.z + (c.to.z - c.from.z) * t };
+}
+
+function stepComet(s: SimState) {
+  const c = s.comet;
+  if (!c) return;
+  const head = cometHead(c, s.tick);
+  if (head) {
+    for (const e of s.entities.values()) {
+      if ((e.kind === 'unit' || e.kind === 'module') && dist(e.pos, head) < COMET.reach + radiusOf(e)) e.hp -= COMET.damagePerTick;
+    }
+  }
+  if (s.tick < c.end) return;
+  // restos: cristales de energía helada en puntos simétricos de la estela (t y 1 - t)
+  const rng = new Rng(s.rngState || s.seed || 1);
+  const lerpAt = (t: number) => ({ x: c.from.x + (c.to.x - c.from.x) * t, z: c.from.z + (c.to.z - c.from.z) * t });
+  const ok = (p: Vec) => Math.abs(p.x) < MAP_HALF - 12 && Math.abs(p.z) < MAP_HALF - 12
+    && s.holes.every(h => dist(h.pos, p) > h.radius + 6)
+    && [...s.entities.values()].every(e => e.kind !== 'planet' || dist(e.pos, p) > e.radius + 6);
+  for (const t of COMET.drops) {
+    for (let k = 0; k < COMET.rocks; k++) {
+      const off = { x: rng.range(-7, 7), z: rng.range(-7, 7) };
+      const a = lerpAt(t), b = lerpAt(1 - t);
+      const pa = { x: a.x + off.x, z: a.z + off.z }, pb = { x: b.x - off.x, z: b.z - off.z };
+      if (!ok(pa) || !ok(pb)) continue;
+      for (const p of [pa, pb]) addAsteroid(s, 'energy', p, rng).amount *= COMET.richness;
+    }
+  }
+  s.rngState = rng.state;
+  s.events.push({ kind: 'comet', phase: 'drop', from: { ...c.from }, to: { ...c.to } });
+  s.comet = null;
+}
+
 function stepEnergy(s: SimState) {
   for (const m of modules(s)) {
     if (m.built < 1) continue;
@@ -444,6 +493,7 @@ function closeLedger(s: SimState) {
   s.events.push({ kind: 'ledger', seq: s.ledger });
   for (const p of planets(s)) if (p.owner !== -1) s.players[p.owner].res.lumens += PLANET.incomePerLedger;
   if (s.ledger % ANOMALY.everyLedgers === 0) spawnAnomaly(s);
+  if (s.ledger % COMET.everyLedgers === COMET.offsetLedgers && !s.comet) launchComet(s);
   for (const m of modules(s)) {
     const inc = MODULES[m.type].perLedger;
     if (inc && m.built >= 1) refund(s.players[m.side].res, inc);

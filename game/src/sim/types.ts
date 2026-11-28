@@ -96,6 +96,9 @@ export interface Wormhole { a: Vec; b: Vec; radius: number }
 /** nebulosa iónica: lo que está dentro no se ve ni se apunta desde lejos (emboscadas) */
 export interface Nebula { pos: Vec; radius: number }
 
+/** cometa que cruza el mapa: aviso desde `warn`, vuelo de `start` a `end` (ticks) */
+export interface Comet { from: Vec; to: Vec; warn: number; start: number; end: number }
+
 export type Entity = Unit | Module | Asteroid | Planet;
 
 export interface Player {
@@ -124,6 +127,7 @@ export type SimEvent =
   | { kind: 'captured'; planet: number; side: Side }
   | { kind: 'era'; side: Side; era: Era }
   | { kind: 'anomaly'; pos: Vec; res: AsteroidKind }
+  | { kind: 'comet'; phase: 'warn' | 'drop'; from: Vec; to: Vec }
   | { kind: 'warp'; from: Vec; to: Vec; side: Side }
   | { kind: 'planetDestroyed'; pos: Vec; radius: number; name: string; side: Owner; loot: Res };
 
@@ -152,4 +156,5 @@ export interface SimState {
   holes: BlackHole[];
   wormholes: Wormhole[];
   nebulae: Nebula[];
+  comet: Comet | null;
 }
