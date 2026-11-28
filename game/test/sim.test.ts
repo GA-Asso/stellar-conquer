@@ -294,3 +294,31 @@ describe('Mercado Central', () => {
     expect(s.market.price.lumens).toBeGreaterThan(p0);
   });
 });
+
+describe('drones constructores', () => {
+  it('al terminar una obra pasan a la siguiente pendiente en vez de irse a minar', async () => {
+    const { applyCommand, modules: mods } = await import('../src/sim/sim');
+    const s = createSim(4);
+    s.players[0].res = { lumens: 5000, metal: 5000, energy: 5000 };
+    const d = units(s, 0)[0];
+    applyCommand(s, 0, { kind: 'build', units: [d.id], module: 'habitat', hex: freePorts(s, 0, 'habitat')[0] });
+    applyCommand(s, 0, { kind: 'build', units: [units(s, 0)[1].id], module: 'solar', hex: freePorts(s, 0, 'solar')[0] });
+    const solar = mods(s, 0).find(m => m.type === 'solar')!;
+    // el segundo dron se va: el panel queda a medias
+    units(s, 0)[1].order = { kind: 'idle' };
+    run(s, MODULES.habitat.buildTime + 4);
+    expect(mods(s, 0).find(m => m.type === 'habitat')!.built).toBe(1);
+    expect(d.order.kind).toBe('build');
+    expect(d.order.kind === 'build' && d.order.target).toBe(solar.id);
+  });
+
+  it('la cola de fabricación admite hasta 15 unidades', async () => {
+    const { applyCommand } = await import('../src/sim/sim');
+    const { QUEUE_MAX } = await import('../src/sim/defs');
+    const s = createSim(4);
+    s.players[0].res = { lumens: 1e5, metal: 1e5, energy: 1e5 };
+    const c = coreOf(s, 0)!;
+    for (let i = 0; i < 20; i++) applyCommand(s, 0, { kind: 'train', module: c.id, unit: 'drone' });
+    expect(c.queue.length).toBe(QUEUE_MAX);
+  });
+});

@@ -249,4 +249,9 @@ export const COMET = { everyLedgers: 20, offsetLedgers: 8, warnTicks: 80, flight
 export const MARKET = { pos: { x: 0, z: 0 }, radius: 20, reach: 60, lot: 100, fee: 0.12, step: 0.06, relax: 0.15,
   base: { lumens: 1, metal: 1, energy: 2 } as Res, min: 0.35, max: 3 };
 
+/** máximo de unidades en la cola de fabricación de cada módulo */
+export const QUEUE_MAX = 15;
+/** al terminar una obra, los drones buscan otra sin terminar a esta distancia antes de volver a minar */
+export const BUILD_SEEK = 140;
+
 export const BLACK_HOLES = { minSpeed: 0.3, spots: [{ x: 150, z: 240, r: 38 }, { x: -215, z: 20, r: 34 }] };

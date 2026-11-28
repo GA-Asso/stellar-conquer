@@ -1,6 +1,6 @@
 // Motor de la simulación: un paso fijo a 20 Hz. Recibe comandos y avanza el estado.
 import {
-  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, COMET, DEPOSITS, MARKET, NEBULAE, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
+  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, BUILD_SEEK, COMET, DEPOSITS, MARKET, QUEUE_MAX, NEBULAE, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
 } from './defs';
 import { hexDist, hexKey, hexNeighbors, hexToWorld, worldToHex } from './hex';
 import { Rng } from './rng';
@@ -341,7 +341,7 @@ export function applyCommand(s: SimState, side: Side, cmd: Command) {
       const m = s.entities.get(cmd.module);
       if (!m || m.kind !== 'module' || m.side !== side || m.built < 1) return;
       const md = MODULES[m.type], ud = UNITS[cmd.unit];
-      if (!md.trains.includes(cmd.unit) || pl.era < ud.era || m.queue.length >= 6) return;
+      if (!md.trains.includes(cmd.unit) || pl.era < ud.era || m.queue.length >= QUEUE_MAX) return;
       if (!canAfford(pl.res, ud.cost)) return;
       pay(pl.res, ud.cost);
       m.queue.push({ item: cmd.unit, progress: 0, total: ud.trainTime });
@@ -808,14 +808,28 @@ function stepUnit(s: SimState, u: Unit) {
       } else if (m.hp < m.maxHp) {
         m.hp = Math.min(m.maxHp, m.hp + (m.maxHp / md.buildTime) * DT * 0.5);
       } else {
-        u.order = { kind: 'idle' };
+        afterBuild(s, u, m);
       }
       break;
     }
   }
 }
 
+/** la obra propia sin terminar más cercana (o un módulo dañado) para seguir trabajando */
+function nextWork(s: SimState, u: Unit, from: Vec): Module | null {
+  let best: Module | null = null, bd = BUILD_SEEK;
+  for (const e of s.entities.values()) {
+    if (e.kind !== 'module' || e.side !== u.side || e.built >= 1) continue;
+    const d = dist(e.pos, from);
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+
 function afterBuild(s: SimState, u: Unit, m: Module) {
+  // primero, otras obras pendientes cerca: un dron constructor no deja edificios a medias
+  const work = nextWork(s, u, m.pos);
+  if (work) { u.order = { kind: 'build', target: work.id }; return; }
   // tras ensamblar un ancla, los drones se ponen a minar lo que haya cerca
   if (MODULES[m.type].dropsite) {
     const a = nearestAsteroid(s, null, m.pos, 60);

@@ -1,6 +1,6 @@
 // HUD: recursos, ledger, panel de selección, botonera de órdenes, minimapa y avisos.
 import { Vector3 } from 'three';
-import { DEPOSITS, ERA_UP, ERAS, LEDGER_TICKS, MAP_HALF, MARKET, MODULES, TICK_HZ, UNITS } from '../sim/defs';
+import { DEPOSITS, ERA_UP, ERAS, LEDGER_TICKS, MAP_HALF, MARKET, MODULES, QUEUE_MAX, TICK_HZ, UNITS } from '../sim/defs';
 import { canAfford, cometHead, coreOf, hasBuilt, hiddenFrom, marketAccess, marketQuote, popCap, popUsed } from '../sim/sim';
 import type { Command, Entity, Module, ModuleType, Res, ResKey, Side, SimState, Unit, UnitType } from '../sim/types';
 import type { GameView } from '../render/view';
@@ -278,16 +278,14 @@ export class Hud {
         if (e.built < 1) extra = `<div class="progress"><i style="width:${e.built * 100}%"></i><span>Ensamblaje ${Math.floor(e.built * 100)} %</span></div>`;
         else if (e.queue.length) {
           const q = e.queue[0];
-          // cola en casillas: la primera se rellena con el progreso, el resto espera; 6 huecos como el límite
-          const slots = Array.from({ length: 6 }, (_, i) => {
-            const it = e.queue[i];
-            if (!it) return '<span class="slot"></span>';
+          // cola en casillas: la primera se rellena con el progreso, el resto espera (hasta QUEUE_MAX)
+          const slots = e.queue.map((it, i) => {
             const g = it.item === 'era' ? '⬆' : UNIT_GLYPH[it.item];
             const name = it.item === 'era' ? 'Avance de era' : UNITS[it.item].name;
             return `<span class="slot full${i === 0 ? ' now' : ''}" title="${name}">${i === 0 ? `<i style="height:${(it.progress / it.total) * 100}%"></i>` : ''}<b>${g}</b></span>`;
           }).join('');
           const nowName = q.item === 'era' ? 'Avance de era' : UNITS[q.item].name;
-          extra = `<div class="queue">${slots}<div class="q-now"><span>${nowName}</span><b>${Math.ceil(q.total - q.progress)} s</b></div></div>`;
+          extra = `<div class="q-now"><span>${nowName} · <b>${Math.ceil(q.total - q.progress)} s</b></span><span>${e.queue.length}/${QUEUE_MAX} en cola</span></div><div class="queue">${slots}</div>`;
         }
         if (e.type === 'beacon' && e.built >= 1) extra += `<div class="stats"><span>Quórum: ${s.players[e.side].beaconLedgers}/30 ledgers</span></div>`;
         const hint = e.side !== this.side ? 'Módulo enemigo: los robots le hacen el doble de daño.'
@@ -391,9 +389,9 @@ export class Hud {
         const eraOk = pl.era >= d.era;
         const afford = canAfford(pl.res, d.cost);
         buttons.push({
-          key: d.hotkey, label: d.name, sub: costText(d.cost), enabled: eraOk && afford && mod.queue.length < 6,
+          key: d.hotkey, label: d.name, sub: costText(d.cost), enabled: eraOk && afford && mod.queue.length < QUEUE_MAX,
           glyph: UNIT_GLYPH[t as UnitType], help: UNIT_HELP[t as UnitType],
-          why: !eraOk ? `Era ${ERAS[d.era].name}` : !afford ? 'Faltan recursos' : '',
+          why: !eraOk ? `Era ${ERAS[d.era].name}` : mod.queue.length >= QUEUE_MAX ? `Cola llena (${QUEUE_MAX})` : !afford ? 'Faltan recursos' : '',
           run: () => this.send({ kind: 'train', module: mod.id, unit: t }),
         });
       }

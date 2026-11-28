@@ -92,13 +92,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .stats span { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border: 1px solid rgba(255,255,255,0.08); border-radius: 3px; display: inline-flex; gap: 5px; }
 .stats b { color: var(--ink); font-weight: 500; }
 .stats .task { color: var(--ally); border-color: rgba(46,230,255,0.25); }
-.queue { display: flex; align-items: center; gap: 4px; margin: 2px 0 4px; }
-.queue .slot { position: relative; width: 28px; height: 28px; border: 1px dashed rgba(255,255,255,0.12); border-radius: 3px; display: grid; place-items: center; overflow: hidden; }
+.queue { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 2px 0 4px; }
+.queue .slot { position: relative; width: 24px; height: 24px; border: 1px dashed rgba(255,255,255,0.12); border-radius: 3px; display: grid; place-items: center; overflow: hidden; }
 .queue .slot.full { border-style: solid; border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.03); }
 .queue .slot.now { border-color: var(--stellar); }
 .queue .slot i { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(253,218,36,0.28); }
 .queue .slot b { position: relative; font-size: 14px; font-weight: 400; color: var(--ink); font-family: "Apple Symbols", "Segoe UI Symbol", sans-serif; }
-.q-now { margin-left: 8px; display: flex; flex-direction: column; font-size: 11px; color: var(--muted); line-height: 1.25; }
+.q-now { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); line-height: 1.25; margin-top: 2px; }
 .q-now b { font-family: var(--mono); color: var(--stellar); font-weight: 500; }
 .multi { display: flex; flex-wrap: wrap; gap: 6px; }
 .multi span { padding: 4px 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; font-size: 12px; }
