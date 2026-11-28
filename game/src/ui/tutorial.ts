@@ -58,7 +58,7 @@ export const STEPS: Step[] = [
   },
   {
     title: 'Investiga y avanza de era',
-    how: 'Acopla un Laboratorio Soroban (H). Después selecciona el Núcleo y pulsa «Avanzar a Consenso» (U): desbloquea torretas y naves mejores.',
+    how: 'Acopla un Laboratorio de Eras (H). Después selecciona el Núcleo y pulsa «Avanzar a Consenso» (U): desbloquea torretas y naves mejores.',
     highlight: (s, side) => hasBuilt(s, side, 'lab') ? 'U' : 'H',
     done: (s, side) => s.players[side].era >= 2,
   },

@@ -106,15 +106,16 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 
 /* órdenes */
 .orders .commands { padding: 6px; flex: 1; }
-.commands { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 54px; gap: 4px; align-content: start; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
+.commands { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 58px; gap: 4px; align-content: start; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
 .commands button { position: relative; text-align: left; background: rgba(255,255,255,0.025); color: var(--ink); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px;
   padding: 5px 7px; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; transition: border-color 0.12s, background 0.12s; }
 .commands button:hover { border-color: rgba(253,218,36,0.6); background: rgba(253,218,36,0.06); }
 .commands button:active { transform: translateY(1px); }
 .commands button.off { opacity: 0.5; cursor: not-allowed; }
 .commands button.off:hover { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.025); }
-.c-top { display: flex; align-items: center; gap: 5px; min-width: 0; padding-right: 14px; }
-.commands b { font-size: 11.5px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.c-top { display: flex; align-items: flex-start; gap: 5px; min-width: 0; padding-right: 14px; }
+/* nombres completos en hasta dos líneas: que se lea qué es cada edificio */
+.commands b { font-size: 11px; font-weight: 600; line-height: 1.15; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .commands small { font-family: var(--mono); font-size: 10.5px; white-space: nowrap; overflow: hidden; }
 .commands em { position: absolute; left: 0; right: 0; bottom: 0; font-size: 9.5px; color: #ff9aa6; background: rgba(255,84,104,0.12); padding: 1px 7px; font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .commands button.off small { visibility: hidden; }
@@ -170,7 +171,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .commands button.hl { border-color: var(--stellar); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(253,218,36,0.0); } 50% { box-shadow: 0 0 0 4px rgba(253,218,36,0.35), 0 0 22px rgba(253,218,36,0.4); } }
 
-.tip { position: fixed; width: 290px; background: rgba(8,10,20,0.96); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.12s, transform 0.12s; z-index: 5; }
+.tip { position: fixed; width: 300px; background: rgba(8,10,20,0.96); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.12s, transform 0.12s; z-index: 5; }
 .tip.show { opacity: 1; transform: none; }
 .tip h4 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .tip h4 i { font-style: normal; color: var(--ally); font-size: 18px; }
@@ -648,3 +649,19 @@ a.u-srcl:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,
 @media (prefers-reduced-transparency: reduce) {
   .u-top, .u-panel, .u-search label, .u-results, .u-route, .u-legend, .u-card, .lb-mode, .lb-stats { background: rgba(14,16,28,0.96); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
+
+/* tarjeta de construcción: vista previa del edificio, su función y sus beneficios */
+.tip-preview { position: relative; margin: -4px -6px 8px; height: 150px; border-radius: 8px; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 100%, color-mix(in srgb, var(--role) 28%, transparent), transparent 70%), linear-gradient(180deg, #0b1020, #070912);
+  border: 1px solid color-mix(in srgb, var(--role) 40%, transparent); }
+.tip-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.tip-role { position: absolute; left: 8px; top: 8px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #06070d; background: var(--role); padding: 2px 7px; border-radius: 999px; font-weight: 700; }
+.tip-benefits, .card-benefits { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 8px; }
+.tip-benefits span, .card-benefits span { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; color: #eaf0ff;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+.tip-benefits span::before, .card-benefits span::before { content: '✓ '; color: #7fe0a8; }
+.card-benefits { margin: 6px 0 4px; align-items: center; }
+.card-benefits b { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--role); margin-right: 2px; }
+.card-img { flex-shrink: 0; width: 64px; height: 64px; object-fit: contain; border-radius: 6px; border: 1px solid var(--line);
+  background: radial-gradient(100% 80% at 50% 100%, rgba(46,230,255,0.14), transparent 70%), #080b16; }

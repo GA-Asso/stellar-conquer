@@ -8,6 +8,7 @@ import type { SpaceScene } from '../render/scene';
 import type { Input } from './input';
 import { MODULE_GLYPH, MODULE_ROLE, ROLE_INFO, UNIT_GLYPH } from '../render/icons';
 import { WORMHOLE_COLORS } from '../render/wormhole';
+import { moduleThumb } from '../render/thumbs';
 import { Tutorial } from './tutorial';
 
 // explicación larga de cada botón: para qué sirve y cuándo conviene
@@ -18,7 +19,7 @@ const MODULE_HELP: Record<ModuleType, string> = {
   anchor: 'Puesto avanzado: se puede colocar LEJOS de tu estación, junto a un campo de asteroides. Los drones descargan ahí y viajan menos. Se le pueden acoplar módulos.',
   hangar: 'Fabrica naves: Interceptores (rápidos), Fragatas (era Consenso, artillería) y el Acorazado (era Galáctica).',
   factory: 'Fabrica robots de abordaje: Mechas y Titanes. Son los únicos que conquistan planetas y hacen doble daño a módulos.',
-  lab: 'Laboratorio Soroban: necesario para avanzar de era desde el Núcleo. Además, tus drones minan un 20 % más rápido.',
+  lab: 'Laboratorio de Eras: necesario para avanzar de era desde el Núcleo. Además, tus drones minan un 20 % más rápido.',
   turret: 'Defensa automática que dispara a las unidades enemigas cercanas. Ponla en el lado que mira al rival.',
   beacon: 'La maravilla. Si resiste 30 ledgers (~2,5 min) ganas la partida. El rival intentará destruirlo.',
   seti: 'Inspirada en la búsqueda de señales extraterrestres: cada ledger capta una señal que suma 10 Lumens y 6 de energía. Barata y útil desde el principio.',
@@ -36,7 +37,7 @@ const UNIT_HELP: Record<UnitType, string> = {
   dreadnought: 'Nave insignia, enorme y muy resistente. Ideal para el asalto final.',
 };
 
-interface Button { key: string; label: string; sub: string; cost?: Res; enabled: boolean; why?: string; run: () => void; glyph?: string; tint?: string; help?: string }
+interface Button { key: string; label: string; sub: string; cost?: Res; enabled: boolean; why?: string; run: () => void; glyph?: string; tint?: string; help?: string; module?: ModuleType }
 
 /** nombre de la función a partir de su color, para el título del ícono del botón */
 const ROLE_LABEL: Record<string, string> = Object.fromEntries(Object.values(ROLE_INFO).map(r => [r.color, r.label]));
@@ -129,10 +130,16 @@ export class Hud {
       const b = (e.target as HTMLElement).closest('button');
       const btn = b ? this.buttons[Number(b.dataset.i)] : null;
       if (!b || !btn) { this.tip.classList.remove('show'); return; }
-      this.tip.innerHTML = `<h4>${btn.glyph ? `<i>${btn.glyph}</i>` : ''}${btn.label} <kbd>${btn.key === 'Backspace' ? '⌫' : btn.key}</kbd></h4>
+      // edificio: vista previa del modelo, su función y sus beneficios antes de construirlo
+      const m = btn.module;
+      const role = m ? ROLE_INFO[MODULE_ROLE[m]] : null;
+      const preview = m && role ? `<div class="tip-preview" style="--role:${role.color}">
+          <img src="${moduleThumb(m, this.side)}" alt="${btn.label}"><span class="tip-role">${role.label}</span></div>
+          <div class="tip-benefits">${MODULES[m].benefits.map(b => `<span>${b}</span>`).join('')}</div>` : '';
+      this.tip.innerHTML = `${preview}<h4>${btn.glyph ? `<i${role ? ` style="color:${role.color}"` : ''}>${btn.glyph}</i>` : ''}${btn.label} <kbd>${btn.key === 'Backspace' ? '⌫' : btn.key}</kbd></h4>
         ${btn.help ? `<p>${btn.help}</p>` : ''}<div class="tip-cost">${btn.sub}</div>${btn.why ? `<em>${btn.why}</em>` : ''}`;
       const r = b.getBoundingClientRect();
-      this.tip.style.left = `${Math.min(window.innerWidth - 300, r.left)}px`;
+      this.tip.style.left = `${Math.min(window.innerWidth - 310, r.left)}px`;
       this.tip.style.bottom = `${window.innerHeight - r.top + 8}px`;
       this.tip.classList.add('show');
     });
@@ -285,7 +292,8 @@ export class Hud {
           : e.built < 1 ? 'En ensamblaje: selecciona drones y haz clic derecho aquí para acelerarlo.'
           : MODULES[e.type].trains.length ? 'Pulsa un botón de la derecha para fabricar. Clic derecho en el mapa fija el punto de reunión de lo que salga.'
           : e.type === 'lab' ? 'Ya puedes avanzar de era: selecciona el Núcleo y pulsa «Avanzar».' : MODULE_HELP[e.type];
-        html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, extra, hint, MODULE_GLYPH[e.type]);
+        extra = `<div class="card-benefits" style="--role:${ROLE_INFO[MODULE_ROLE[e.type]].color}"><b>${ROLE_INFO[MODULE_ROLE[e.type]].label}</b>${d.benefits.map(b => `<span>${b}</span>`).join('')}</div>` + extra;
+        html = this.card(d.name, d.desc, e.hp, e.maxHp, e.side, extra, hint, MODULE_GLYPH[e.type], moduleThumb(e.type, e.side));
       } else if (e.kind === 'asteroid') {
         html = this.card(DEPOSITS[e.res].name, `Quedan ${Math.floor(e.amount)} unidades.`, 0, 0, -1, '',
           'Selecciona drones y haz clic derecho sobre él para minarlo.');
@@ -308,12 +316,12 @@ export class Hud {
     if (h.innerHTML !== head) h.innerHTML = head;
   }
 
-  private card(name: string, desc: string, hp: number, max: number, side: number, extra: string, hint = '', glyph = '') {
+  private card(name: string, desc: string, hp: number, max: number, side: number, extra: string, hint = '', glyph = '', img = '') {
     const k = max > 0 ? hp / max : 1;
     const hpBar = max > 0 ? `<div class="hp ${k > 0.6 ? '' : k > 0.3 ? 'mid' : 'low'}"><i style="width:${k * 100}%"></i></div><div class="hp-num"><span>Integridad</span><b>${Math.ceil(hp)} / ${max}</b></div>` : '';
     const tag = side === this.side ? 'Tuyo' : side === -1 ? 'Neutral' : 'Rival';
     return `<div class="card side-${side === this.side ? 0 : side === -1 ? -1 : 1}">
-      <div class="card-id">${glyph ? `<i class="card-g">${glyph}</i>` : ''}<div><h3>${name}</h3><p>${desc}</p></div><span class="card-tag">${tag}</span></div>
+      <div class="card-id">${img ? `<img class="card-img" src="${img}" alt="">` : glyph ? `<i class="card-g">${glyph}</i>` : ''}<div><h3>${name}</h3><p>${desc}</p></div><span class="card-tag">${tag}</span></div>
       ${hpBar}${extra}${hint ? `<div class="hint"><i>i</i>${hint}</div>` : ''}</div>`;
   }
 
@@ -330,7 +338,7 @@ export class Hud {
         const eraOk = pl.era >= d.era;
         const afford = canAfford(pl.res, d.cost);
         buttons.push({
-          key: d.hotkey, label: d.name, sub: costText(d.cost), cost: d.cost, enabled: eraOk && afford, glyph: MODULE_GLYPH[t], tint: ROLE_INFO[MODULE_ROLE[t]].color, help: MODULE_HELP[t],
+          key: d.hotkey, label: d.name, sub: costText(d.cost), cost: d.cost, enabled: eraOk && afford, glyph: MODULE_GLYPH[t], tint: ROLE_INFO[MODULE_ROLE[t]].color, help: MODULE_HELP[t], module: t,
           why: !eraOk ? `Era ${ERAS[d.era].name}` : !afford ? 'Faltan recursos' : '',
           run: () => this.input.startBuild(t),
         });
@@ -357,7 +365,7 @@ export class Hud {
           key: 'U', label: `Avanzar a ${ERAS[next].name}`, sub: costText(up.cost), glyph: '⬆',
           help: `Investiga la era ${ERAS[next].name} (${up.time} s): «${ERAS[next].lema}». Desbloquea módulos y unidades nuevas.`,
           enabled: lab && !busy && canAfford(pl.res, up.cost),
-          why: !lab ? 'Requiere Laboratorio Soroban' : busy ? 'Investigando' : !canAfford(pl.res, up.cost) ? 'Faltan recursos' : '',
+          why: !lab ? 'Requiere Laboratorio de Eras' : busy ? 'Investigando' : !canAfford(pl.res, up.cost) ? 'Faltan recursos' : '',
           run: () => this.send({ kind: 'era', module: mod.id }),
         });
       }

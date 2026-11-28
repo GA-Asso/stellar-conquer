@@ -73,6 +73,8 @@ export const UNITS: Record<UnitType, UnitDef> = {
 export interface ModuleDef {
   name: string;
   desc: string;
+  /** beneficios para el jugador, en frases cortas: se muestran como chips en la tarjeta */
+  benefits: string[];
   cost: Res;
   hp: number;
   buildTime: number;
@@ -101,69 +103,69 @@ export interface ModuleDef {
 
 export const MODULES: Record<ModuleType, ModuleDef> = {
   core: {
-    name: 'Núcleo Estelar', desc: 'Corazón de la estación. Si cae, pierdes.',
+    name: 'Núcleo Estelar', desc: 'Corazón de la estación. Si cae, pierdes.', benefits: ['Fabrica drones', 'Recibe recursos', '+6 población'],
     cost: cost(), hp: 3200, buildTime: 1, era: 1, pop: 6, energy: 0.3, trains: ['drone'],
     dropsite: true, freePlacement: false, attack: { damage: 6, range: 44, cooldown: 1.2, weapon: 'laser' },
     // ocupa su celda y las 6 vecinas (ver footprint en sim.ts): es la ciudadela, no un módulo más
     sight: 90, radius: 22, hotkey: '',
   },
   habitat: {
-    name: 'Hábitat', desc: '+8 de población.', cost: cost(0, 50), hp: 520, buildTime: 14, era: 1, pop: 8, energy: 0,
+    name: 'Hábitat', desc: 'Viviendas para tu tripulación.', benefits: ['+8 población'], cost: cost(0, 50), hp: 520, buildTime: 14, era: 1, pop: 8, energy: 0,
     trains: [], dropsite: false, freePlacement: false, sight: 30, radius: 7, hotkey: 'A',
   },
   solar: {
-    name: 'Panel Solar', desc: 'Genera energía de forma continua.', cost: cost(0, 45), hp: 320, buildTime: 12, era: 1, pop: 0,
+    name: 'Panel Solar', desc: 'Genera energía de forma continua.', benefits: ['+0,9 energía por segundo'], cost: cost(0, 45), hp: 320, buildTime: 12, era: 1, pop: 0,
     energy: 0.9, trains: [], dropsite: false, freePlacement: false, sight: 25, radius: 7, hotkey: 'S',
   },
   anchor: {
-    name: 'Ancla', desc: 'Puesto remoto: descarga de recursos y nuevo punto de acople.', cost: cost(0, 100), hp: 700,
+    name: 'Puesto de Descarga', desc: 'Puesto remoto: se coloca lejos, junto a los recursos.', benefits: ['Drones viajan menos', 'Se coloca donde quieras', 'Nuevo punto de acople'], cost: cost(0, 100), hp: 700,
     buildTime: 20, era: 1, pop: 0, energy: 0, trains: [], dropsite: true, freePlacement: true, sight: 45, radius: 7, hotkey: 'D',
   },
   hangar: {
-    name: 'Hangar', desc: 'Construye naves de combate.', cost: cost(40, 120), hp: 900, buildTime: 24, era: 1, pop: 0, energy: 0,
+    name: 'Hangar de Naves', desc: 'Construye naves de combate.', benefits: ['Interceptores', 'Fragatas', 'Acorazado'], cost: cost(40, 120), hp: 900, buildTime: 24, era: 1, pop: 0, energy: 0,
     trains: ['interceptor', 'frigate', 'dreadnought'], dropsite: false, freePlacement: false, sight: 35, radius: 8, hotkey: 'F',
   },
   factory: {
-    name: 'Forja de Robots', desc: 'Ensambla robots de abordaje.', cost: cost(40, 130), hp: 900, buildTime: 24, era: 1, pop: 0,
+    name: 'Forja de Robots', desc: 'Ensambla robots de abordaje.', benefits: ['Mechas y Titanes', 'Conquistan planetas', 'Doble daño a edificios'], cost: cost(40, 130), hp: 900, buildTime: 24, era: 1, pop: 0,
     energy: 0, trains: ['mecha', 'titan'], dropsite: false, freePlacement: false, sight: 35, radius: 8, hotkey: 'G',
   },
   lab: {
-    name: 'Laboratorio Soroban', desc: 'Necesario para avanzar de era. +20 % de recolección.', cost: cost(80, 100), hp: 600,
+    name: 'Laboratorio de Eras', desc: 'Investiga eras nuevas desde el Núcleo.', benefits: ['Desbloquea eras', '+20 % minería'], cost: cost(80, 100), hp: 600,
     buildTime: 26, era: 1, pop: 0, energy: 0.2, trains: [], dropsite: false, freePlacement: false, sight: 30, radius: 7, hotkey: 'H',
   },
   turret: {
-    name: 'Torreta Láser', desc: 'Defensa automática.', cost: cost(30, 70, 20), hp: 650, buildTime: 16, era: 2, pop: 0,
+    name: 'Torreta Láser', desc: 'Defensa automática.', benefits: ['Dispara sola', 'Alcance 40'], cost: cost(30, 70, 20), hp: 650, buildTime: 16, era: 2, pop: 0,
     energy: 0, trains: [], dropsite: false, freePlacement: false,
     attack: { damage: 11, range: 40, cooldown: 1, weapon: 'laser' }, sight: 50, radius: 6, hotkey: 'J',
   },
   beacon: {
-    name: 'Faro de Consenso', desc: 'Maravilla: si resiste 30 ledgers, ganas la partida.', cost: cost(1200, 1000, 400),
+    name: 'Faro de la Victoria', desc: 'Maravilla: si resiste 30 ledgers, ganas la partida.', benefits: ['Victoria si resiste 30 ledgers'], cost: cost(1200, 1000, 400),
     hp: 4200, buildTime: 90, era: 4, pop: 0, energy: 0, trains: [], dropsite: false, freePlacement: false,
     sight: 60, radius: 9, hotkey: 'K',
   },
   // tecnología de civilizaciones avanzadas: ideas reales de la búsqueda de tecnofirmas, con nombre de juego
   seti: {
-    name: 'Antena SETI', desc: 'Escucha el cosmos: cada ledger capta una señal que trae Lumens y energía.', cost: cost(60, 80),
+    name: 'Antena de Señales', desc: 'Escucha el cosmos y capta señales con recursos.', benefits: ['+10 Lumens por ledger', '+6 energía por ledger'], cost: cost(60, 80),
     hp: 450, buildTime: 18, era: 1, pop: 0, energy: 0, trains: [], dropsite: false, freePlacement: false, sight: 90, radius: 7,
     hotkey: 'L', perLedger: cost(10, 0, 6),
   },
   replicator: {
-    name: 'Replicador Von Neumann', desc: 'Máquina que se copia a sí misma: fabrica un dron gratis cada 30 s.', cost: cost(150, 150, 40),
+    name: 'Fábrica de Drones', desc: 'Máquina Von Neumann que se copia a sí misma.', benefits: ['Dron gratis cada 30 s'], cost: cost(150, 150, 40),
     hp: 700, buildTime: 30, era: 2, pop: 0, energy: 0, trains: [], dropsite: false, freePlacement: false, sight: 35, radius: 7,
     hotkey: 'B', replicate: 30,
   },
   shield: {
-    name: 'Proyector de Escudo', desc: 'Cúpula de fuerza: tus módulos y unidades cercanas reciben 35 % menos daño.', cost: cost(60, 120, 60),
+    name: 'Proyector de Escudo', desc: 'Cúpula de fuerza sobre tu estación.', benefits: ['−35 % de daño recibido', 'Radio 42'], cost: cost(60, 120, 60),
     hp: 600, buildTime: 22, era: 2, pop: 0, energy: 0, trains: [], dropsite: false, freePlacement: false, sight: 40, radius: 7,
     hotkey: 'N', shield: { radius: 42, reduction: 0.35 },
   },
   dyson: {
-    name: 'Enjambre Dyson', desc: 'Miles de colectores en órbita de una estrella artificial: energía a raudales.', cost: cost(200, 260),
+    name: 'Planta Dyson', desc: 'Colectores en órbita de una estrella artificial.', benefits: ['+3 energía por segundo'], cost: cost(200, 260),
     hp: 950, buildTime: 40, era: 3, pop: 0, energy: 3, trains: [], dropsite: false, freePlacement: false, sight: 40, radius: 8,
     hotkey: 'M',
   },
   matrioshka: {
-    name: 'Cerebro Matrioshka', desc: 'Capas de computación alrededor de un sol: +30 % de minería y fabricación 30 % más rápida.',
+    name: 'Centro de Cómputo', desc: 'Capas de computación alrededor de un sol (cerebro Matrioshka).', benefits: ['+30 % minería', 'Fabricación 30 % más rápida'],
     cost: cost(400, 400, 200), hp: 1500, buildTime: 50, era: 4, pop: 0, energy: 0.5, trains: [], dropsite: false, freePlacement: false,
     sight: 50, radius: 8, hotkey: 'O', gatherBonus: 0.3, trainSpeed: 0.3,
   },

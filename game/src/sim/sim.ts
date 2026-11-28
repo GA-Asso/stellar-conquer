@@ -503,7 +503,7 @@ function closeLedger(s: SimState) {
     pl.beaconLedgers = beacon ? pl.beaconLedgers + 1 : 0;
     if (pl.beaconLedgers >= BEACON_LEDGERS_TO_WIN && s.winner === null) {
       s.winner = pl.side;
-      s.winReason = 'El Faro de Consenso alcanzó el quórum';
+      s.winReason = 'El Faro de la Victoria alcanzó el quórum';
     }
   }
 }
