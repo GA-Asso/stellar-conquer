@@ -6,14 +6,33 @@ export const MODULE_GLYPH: Record<ModuleType, string> = {
   core: '✦', habitat: '⌂', solar: '☀', anchor: '⚓', hangar: '✈', factory: '⚙', lab: '⚗', turret: '⌖', beacon: '✺',
   seti: '≋', replicator: '⟁', shield: '⛨', dyson: '☼', matrioshka: '◎',
 };
+/**
+ * Función de cada módulo. Cada función tiene un color propio que se repite en la base del edificio, en su
+ * ícono flotante y en el botón de construir: así una estación grande se lee por zonas y no se confunde.
+ */
+export type ModuleRole = 'core' | 'eco' | 'pop' | 'mil' | 'def' | 'tech';
+export const MODULE_ROLE: Record<ModuleType, ModuleRole> = {
+  core: 'core', habitat: 'pop', solar: 'eco', anchor: 'eco', seti: 'eco', dyson: 'eco',
+  hangar: 'mil', factory: 'mil', turret: 'def', shield: 'def',
+  lab: 'tech', replicator: 'tech', matrioshka: 'tech', beacon: 'tech',
+};
+export const ROLE_INFO: Record<ModuleRole, { label: string; color: string }> = {
+  core: { label: 'Mando', color: '#fdda24' },
+  eco: { label: 'Economía', color: '#ffb547' },
+  pop: { label: 'Población', color: '#4ade80' },
+  mil: { label: 'Militar', color: '#ff5a4e' },
+  def: { label: 'Defensa', color: '#38bdf8' },
+  tech: { label: 'Tecnología', color: '#a78bfa' },
+};
 export const UNIT_GLYPH: Record<UnitType, string> = {
   drone: '◇', interceptor: '➤', mecha: '♜', frigate: '⛴', titan: '♛', dreadnought: '✠',
 };
 
 const cache = new Map<string, THREE.SpriteMaterial>();
 
-export function iconSprite(glyph: string, color: string): THREE.Sprite {
-  const key = glyph + color;
+/** `color` es el marco (bando) y `glyphColor` el símbolo (función del módulo) */
+export function iconSprite(glyph: string, color: string, glyphColor = color): THREE.Sprite {
+  const key = glyph + color + glyphColor;
   let mat = cache.get(key);
   if (!mat) {
     const c = document.createElement('canvas');
@@ -30,7 +49,7 @@ export function iconSprite(glyph: string, color: string): THREE.Sprite {
     x.lineWidth = 5;
     x.strokeStyle = color;
     x.stroke();
-    x.fillStyle = color;
+    x.fillStyle = glyphColor;
     x.font = '64px "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", sans-serif';
     x.textAlign = 'center';
     x.textBaseline = 'middle';

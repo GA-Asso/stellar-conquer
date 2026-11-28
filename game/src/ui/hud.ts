@@ -6,7 +6,7 @@ import type { Command, Entity, Module, ModuleType, Res, Side, SimState, Unit, Un
 import type { GameView } from '../render/view';
 import type { SpaceScene } from '../render/scene';
 import type { Input } from './input';
-import { MODULE_GLYPH, UNIT_GLYPH } from '../render/icons';
+import { MODULE_GLYPH, MODULE_ROLE, ROLE_INFO, UNIT_GLYPH } from '../render/icons';
 import { Tutorial } from './tutorial';
 
 // explicación larga de cada botón: para qué sirve y cuándo conviene
@@ -35,7 +35,10 @@ const UNIT_HELP: Record<UnitType, string> = {
   dreadnought: 'Nave insignia, enorme y muy resistente. Ideal para el asalto final.',
 };
 
-interface Button { key: string; label: string; sub: string; cost?: Res; enabled: boolean; why?: string; run: () => void; glyph?: string; help?: string }
+interface Button { key: string; label: string; sub: string; cost?: Res; enabled: boolean; why?: string; run: () => void; glyph?: string; tint?: string; help?: string }
+
+/** nombre de la función a partir de su color, para el título del ícono del botón */
+const ROLE_LABEL: Record<string, string> = Object.fromEntries(Object.values(ROLE_INFO).map(r => [r.color, r.label]));
 
 const fmt = (n: number) => Math.floor(n).toLocaleString('es');
 const costText = (c: Res) => [
@@ -318,7 +321,7 @@ export class Hud {
         const eraOk = pl.era >= d.era;
         const afford = canAfford(pl.res, d.cost);
         buttons.push({
-          key: d.hotkey, label: d.name, sub: costText(d.cost), cost: d.cost, enabled: eraOk && afford, glyph: MODULE_GLYPH[t], help: MODULE_HELP[t],
+          key: d.hotkey, label: d.name, sub: costText(d.cost), cost: d.cost, enabled: eraOk && afford, glyph: MODULE_GLYPH[t], tint: ROLE_INFO[MODULE_ROLE[t]].color, help: MODULE_HELP[t],
           why: !eraOk ? `Era ${ERAS[d.era].name}` : !afford ? 'Faltan recursos' : '',
           run: () => this.input.startBuild(t),
         });
@@ -359,7 +362,7 @@ export class Hud {
     this.buttonsKey = key;
     this.el.cmds.innerHTML = buttons.map((b, i) => `
       <button data-i="${i}" class="${b.enabled ? '' : 'off'} ${b.key === this.highlight ? 'hl' : ''}">
-        <kbd>${b.key === 'Backspace' ? '⌫' : b.key}</kbd><span class="c-top">${b.glyph ? `<i class="g">${b.glyph}</i>` : ''}<b>${b.label}</b></span><small>${b.sub}</small>${b.why ? `<em>${b.why}</em>` : ''}
+        <kbd>${b.key === 'Backspace' ? '⌫' : b.key}</kbd><span class="c-top">${b.glyph ? `<i class="g"${b.tint ? ` style="color:${b.tint}" title="${ROLE_LABEL[b.tint] ?? ''}"` : ''}>${b.glyph}</i>` : ''}<b>${b.label}</b></span><small>${b.sub}</small>${b.why ? `<em>${b.why}</em>` : ''}
       </button>`).join('');
   }
 

@@ -5,7 +5,7 @@ import { hexToWorld } from '../sim/hex';
 import { coreOf, dist } from '../sim/sim';
 import type { Asteroid, AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
 import { Fx } from './fx';
-import { iconSprite, MODULE_GLYPH } from './icons';
+import { iconSprite, MODULE_GLYPH, MODULE_ROLE, ROLE_INFO } from './icons';
 import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, unitShadow, type Spin } from './models';
 import type { SpaceScene } from './scene';
 import { Scenery } from './scenery';
@@ -151,7 +151,9 @@ export class GameView {
       );
       root.add(cage);
       // ícono flotante para reconocer cada módulo de un vistazo
-      const icon = iconSprite(MODULE_GLYPH[e.type], '#' + SIDE_COLORS[e.side].getHexString());
+      const roleColor = ROLE_INFO[MODULE_ROLE[e.type]].color;
+      if (e.type !== 'core') root.add(rolePad(r, roleColor));
+      const icon = iconSprite(MODULE_GLYPH[e.type], '#' + SIDE_COLORS[e.side].getHexString(), roleColor);
       icon.position.y = e.type === 'beacon' ? 40 : e.type === 'core' ? 50 : 20;
       icon.scale.setScalar(e.type === 'core' ? 0.06 : 0.034);
       root.add(icon);
@@ -378,3 +380,36 @@ export class GameView {
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado
   sideColor(side: Side): string { return '#' + mats(side).trim.color.getHexString(); }
 }
+
+const padCache = new Map<string, { edge: THREE.MeshBasicMaterial; fill: THREE.MeshBasicMaterial; post: THREE.MeshBasicMaterial }>();
+/**
+ * Plataforma con el color de la función del módulo: contorno hexagonal luminoso, suelo tenue y balizas en
+ * las esquinas. El bando lo sigue diciendo el casco; la plataforma dice para qué sirve.
+ */
+function rolePad(r: number, color: string): THREE.Group {
+  let m = padCache.get(color);
+  if (!m) {
+    const c = new THREE.Color(color);
+    m = {
+      edge: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.6), transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }),
+      fill: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
+      post: new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(2) }),
+    };
+    padCache.set(color, m);
+  }
+  const g = new THREE.Group();
+  const R = r + 2.2;
+  const edge = new THREE.Mesh(new THREE.RingGeometry(R - 0.7, R, 6).rotateX(-Math.PI / 2).rotateY(Math.PI / 6), m.edge);
+  edge.position.y = 0.15;
+  const fill = new THREE.Mesh(new THREE.CircleGeometry(R - 0.7, 6).rotateX(-Math.PI / 2).rotateY(Math.PI / 6), m.fill);
+  fill.position.y = 0.1;
+  g.add(edge, fill);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.4, 0.5), m.post);
+    post.position.set(Math.sin(a) * R, 1.2, Math.cos(a) * R);
+    g.add(post);
+  }
+  return g;
+}
+
