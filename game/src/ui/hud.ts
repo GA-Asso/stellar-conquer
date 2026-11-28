@@ -6,7 +6,7 @@ import type { Command, Entity, Module, ModuleType, Res, ResKey, Side, SimState, 
 import type { GameView } from '../render/view';
 import type { SpaceScene } from '../render/scene';
 import type { Input } from './input';
-import { MODULE_GLYPH, MODULE_ROLE, ROLE_INFO, UNIT_GLYPH } from '../render/icons';
+import { MODULE_GLYPH, MODULE_ROLE, ROLE_INFO, svgIcon, UNIT_GLYPH } from '../render/icons';
 import { WORMHOLE_COLORS } from '../render/wormhole';
 import { moduleThumb } from '../render/thumbs';
 import { Tutorial } from './tutorial';
@@ -280,7 +280,7 @@ export class Hud {
           const q = e.queue[0];
           // cola en casillas: la primera se rellena con el progreso, el resto espera (hasta QUEUE_MAX)
           const slots = e.queue.map((it, i) => {
-            const g = it.item === 'era' ? '⬆' : UNIT_GLYPH[it.item];
+            const g = it.item === 'era' ? svgIcon('era') : UNIT_GLYPH[it.item];
             const name = it.item === 'era' ? 'Avance de era' : UNITS[it.item].name;
             return `<span class="slot full${i === 0 ? ' now' : ''}" title="${name}">${i === 0 ? `<i style="height:${(it.progress / it.total) * 100}%"></i>` : ''}<b>${g}</b></span>`;
           }).join('');
@@ -401,7 +401,7 @@ export class Hud {
         const lab = hasBuilt(s, this.side, 'lab');
         const busy = mod.queue.some(q => q.item === 'era');
         buttons.push({
-          key: 'U', label: `Avanzar a ${ERAS[next].name}`, sub: costText(up.cost), glyph: '⬆',
+          key: 'U', label: `Avanzar a ${ERAS[next].name}`, sub: costText(up.cost), glyph: svgIcon('era'),
           help: `Investiga la era ${ERAS[next].name} (${up.time} s): «${ERAS[next].lema}». Desbloquea módulos y unidades nuevas.`,
           enabled: lab && !busy && canAfford(pl.res, up.cost),
           why: !lab ? 'Requiere Laboratorio de Eras' : busy ? 'Investigando' : !canAfford(pl.res, up.cost) ? 'Faltan recursos' : '',

@@ -681,3 +681,10 @@ a.u-srcl:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,
 .mk-grid button:disabled { opacity: 0.4; cursor: not-allowed; }
 .mk-grid i { font-style: normal; color: var(--muted); }
 .market-panel footer { font-size: 10.5px; line-height: 1.35; }
+
+/* íconos vectoriales: mismo trazo en botones, tarjetas, cola y tooltip */
+.vi { width: 1.15em; height: 1.15em; display: block; flex-shrink: 0; }
+.commands .g .vi { width: 16px; height: 16px; }
+.card-g .vi { width: 20px; height: 20px; }
+.queue .slot b .vi { width: 15px; height: 15px; }
+.tip h4 i .vi { width: 18px; height: 18px; }

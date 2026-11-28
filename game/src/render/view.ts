@@ -5,7 +5,7 @@ import { hexToWorld } from '../sim/hex';
 import { coreOf, dist, hiddenFrom, marketAccess } from '../sim/sim';
 import type { Asteroid, AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
 import { Fx } from './fx';
-import { iconSprite, MODULE_GLYPH, MODULE_ROLE, ROLE_INFO } from './icons';
+import { iconSprite, MODULE_ROLE, ROLE_INFO } from './icons';
 import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, unitShadow, type Spin } from './models';
 import type { SpaceScene } from './scene';
 import { Scenery } from './scenery';
@@ -184,7 +184,7 @@ export class GameView {
       // ícono flotante para reconocer cada módulo de un vistazo
       const roleColor = ROLE_INFO[MODULE_ROLE[e.type]].color;
       if (e.type !== 'core') root.add(rolePad(r, roleColor));
-      const icon = iconSprite(MODULE_GLYPH[e.type], '#' + SIDE_COLORS[e.side].getHexString(), roleColor);
+      const icon = iconSprite(e.type, '#' + SIDE_COLORS[e.side].getHexString(), roleColor);
       icon.position.y = e.type === 'beacon' ? 40 : e.type === 'core' ? 50 : 20;
       // tamaño fijo en pantalla, compensado por el campo de visión cerrado de la partida
       icon.scale.setScalar((e.type === 'core' ? 0.06 : 0.034) * (GAME_FOV / 50));
