@@ -10,6 +10,7 @@ import { STATUS_INFO, layoutAtlas, type RavenSnapshot, type Star } from './atlas
 const LOST = '#5d6275';
 import { Scenery, Trail, buildFlagship, buildStructure, starGlow, type Flagship } from './spacecraft';
 import type { SearchTarget } from './search';
+import { atmosphereMaterial, biomeOf, planetMaterial } from './planets';
 
 const SHIP_SPEED = 170;
 const ARRIVE = 22;
@@ -24,6 +25,9 @@ export interface UniverseEvents {
   /** rumbo activo hacia un destino buscado: nombre, distancia restante y segundos estimados (null = sin rumbo) */
   onRoute?(r: { label: string; dist: number; eta: number; color: string } | null): void;
 }
+
+/** planetas de una malla con su giro propio (la matriz de cada instancia se recalcula cada fotograma) */
+interface PlanetSpin { mesh: THREE.InstancedMesh; items: { x: number; z: number; size: number; tilt: THREE.Quaternion; phase: number; rate: number }[] }
 
 interface NodeView { node: WorldNode; obj: THREE.Group; core: THREE.Mesh; ring: THREE.Mesh; tick(t: number): void; label: HTMLDivElement; pos: THREE.Vector3 }
 
@@ -103,6 +107,7 @@ export class Universe {
   private raycaster = new THREE.Raycaster();
   private prevBound: number;
   private stars: Star[] = [];
+  private planets: PlanetSpin[] = [];
   private starMeshes: { mesh: THREE.InstancedMesh; kind: Star['kind']; ids: number[] }[] = [];
   private nearLabels: HTMLDivElement[] = [];
   private hoverLabel: HTMLDivElement;
@@ -184,29 +189,67 @@ export class Universe {
     if (!this.atlas || !this.stars.length) return;
     const atlas = this.atlas;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
-    const make = (kind: Star['kind'], geo: THREE.BufferGeometry) => {
-      const list = this.stars.filter(s => s.kind === kind);
-      if (!list.length) return;
-      // esferas con luz y un brillo propio suave: se leen como astros con volumen, no como discos planos
-      const mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.15, emissive: 0x1c2233 }), list.length);
-      const col = new THREE.Color();
+    const col = new THREE.Color();
+    const sphere = new THREE.SphereGeometry(1, 40, 24);
+    const projects = this.stars.filter(s => s.kind === 'project');
+
+    // planetas: una malla por galaxia y variante de textura, así cada constelación tiene su bioma propio
+    const buckets = new Map<string, Star[]>();
+    for (const st of projects) {
+      const key = `${st.galaxy}:${st.index % 3}`;
+      (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(st);
+    }
+    for (const [key, list] of buckets) {
+      const [galaxy, variant] = key.split(':');
+      const mesh = new THREE.InstancedMesh(sphere, planetMaterial(biomeOf(galaxy), Number(variant)), list.length);
+      const spin: PlanetSpin = { mesh, items: [] };
       list.forEach((st, i) => {
+        // eje inclinado y fase de giro propios de cada planeta, deterministas
+        const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(((st.index * 37) % 50 - 25) * 0.012, 0, ((st.index * 53) % 60 - 30) * 0.012));
+        spin.items.push({ x: st.x, z: st.z, size: st.size, tilt, phase: (st.index * 2.399) % (Math.PI * 2), rate: 0.08 + ((st.index * 13) % 10) * 0.012 });
+        // los proyectos con la web caída se ven apagados: "señal perdida"
+        mesh.setColorAt(i, col.set(atlas.projects[st.index].down ? '#5a5e6e' : '#ffffff'));
+      });
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      this.planets.push(spin);
+      this.root.add(mesh);
+      this.starMeshes.push({ mesh, kind: 'project', ids: list.map(s => this.stars.indexOf(s)) });
+    }
+    this.spinPlanets(0);
+
+    // atmósfera del color del estado: el borde del planeta dice si está en producción, prelanzamiento o desarrollo
+    if (projects.length) {
+      const atmo = new THREE.InstancedMesh(sphere, atmosphereMaterial(), projects.length);
+      projects.forEach((st, i) => {
+        const p = atlas.projects[st.index];
+        pos.set(st.x, 0, st.z);
+        sc.setScalar(st.size * 1.1);
+        m.compose(pos, q, sc);
+        atmo.setMatrixAt(i, m);
+        atmo.setColorAt(i, col.set(p.down ? LOST : STATUS_INFO[p.st].color).multiplyScalar(p.down ? 0.5 : 1.5));
+      });
+      atmo.instanceMatrix.needsUpdate = true;
+      if (atmo.instanceColor) atmo.instanceColor.needsUpdate = true;
+      atmo.raycast = () => {};
+      this.root.add(atmo);
+    }
+
+    // socios: estaciones metálicas en forma de diamante
+    const partners = this.stars.filter(s => s.kind === 'partner');
+    if (partners.length) {
+      const mesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(1.2), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.6, emissive: 0x1c2233 }), partners.length);
+      partners.forEach((st, i) => {
         pos.set(st.x, 0, st.z);
         sc.setScalar(st.size);
         m.compose(pos, q, sc);
         mesh.setMatrixAt(i, m);
-        // los proyectos con la web caída se ven apagados: "señal perdida"
-        if (kind === 'project') col.set(atlas.projects[st.index].down ? LOST : STATUS_INFO[atlas.projects[st.index].st].color).multiplyScalar(atlas.projects[st.index].down ? 0.8 : 1.35);
-        else col.set('#c9cbd6');
-        mesh.setColorAt(i, col);
+        mesh.setColorAt(i, col.set('#c9cbd6'));
       });
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       this.root.add(mesh);
-      this.starMeshes.push({ mesh, kind, ids: list.map(s => this.stars.indexOf(s)) });
-    };
-    make('project', new THREE.IcosahedronGeometry(1, 3));
-    make('partner', new THREE.OctahedronGeometry(1.2));
+      this.starMeshes.push({ mesh, kind: 'partner', ids: partners.map(s => this.stars.indexOf(s)) });
+    }
 
     // halo titilante de cada astro, del color de su estado
     const colors = this.stars.map(st => st.kind === 'project'
@@ -233,6 +276,21 @@ export class Universe {
       });
       rings.instanceMatrix.needsUpdate = true;
       this.root.add(rings);
+    }
+  }
+
+  /** rotación lenta de cada planeta sobre su eje inclinado */
+  private spinPlanets(t: number) {
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), r = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const { mesh, items } of this.planets) {
+      items.forEach((it, i) => {
+        r.setFromAxisAngle(up, it.phase + t * it.rate);
+        q.copy(it.tilt).multiply(r);
+        m.compose(pos.set(it.x, 0, it.z), q, sc.setScalar(it.size));
+        mesh.setMatrixAt(i, m);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
     }
   }
 
@@ -487,6 +545,7 @@ export class Universe {
     for (const v of this.nodes) v.tick(this.t);
     this.scenery.update(dt, this.t);
     this.glowTick?.(this.t);
+    this.spinPlanets(this.t);
     this.flagship.tick(this.t, Math.min(1, this.shipVel.length() / SHIP_SPEED));
     this.trail.update(dt, this.ship.localToWorld(this.tailWorld.copy(this.flagship.tail)), this.shipVel.length());
     // sensación de velocidad: el campo de visión se abre y los bordes se oscurecen al acelerar
