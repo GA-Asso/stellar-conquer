@@ -237,7 +237,7 @@ function bestAsteroid(s: SimState, side: Side, res: AsteroidKind): number | null
       if (dd < bd) { bd = dd; best = a.id; }
     }
   }
-  return bd < 160 ? best : null;
+  return bd < 240 ? best : null;
 }
 
 function pickSpot(s: SimState, side: Side, type: ModuleType) {
@@ -246,7 +246,7 @@ function pickSpot(s: SimState, side: Side, type: ModuleType) {
     // ancla junto al campo más rico que no tenga punto de descarga cerca
     const drops = modules(s, side).filter(m => MODULES[m.type].dropsite);
     const candidates = asteroids(s)
-      .filter(a => drops.every(d => dist(d.pos, a.pos) > 55) && dist(a.pos, core.pos) < 170)
+      .filter(a => drops.every(d => dist(d.pos, a.pos) > 55) && dist(a.pos, core.pos) < 250)
       .sort((a, b) => dist(a.pos, core.pos) - dist(b.pos, core.pos));
     for (const a of candidates) {
       const toCore = Math.atan2(core.pos.z - a.pos.z, core.pos.x - a.pos.x);

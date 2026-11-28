@@ -6,7 +6,8 @@ export const DT = 1 / TICK_HZ;
 // Stellar cierra un ledger cada ~5 segundos
 export const LEDGER_SECONDS = 5;
 export const LEDGER_TICKS = LEDGER_SECONDS * TICK_HZ;
-export const MAP_HALF = 260;
+// mapa amplio: espacio para que cada base crezca sin chocar con los campos de recursos ni con el rival
+export const MAP_HALF = 400;
 export const POP_MAX = 120;
 
 export const cost = (lumens = 0, metal = 0, energy = 0): Res => ({ lumens, metal, energy });

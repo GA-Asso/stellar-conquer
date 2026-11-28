@@ -47,7 +47,7 @@ export class Scenery {
     this.group.add(tilt);
 
     // quórums de validadores en las dos esquinas sin bases
-    for (const [cx, cz] of [[-215, -215], [215, 215]]) {
+    for (const [cx, cz] of [[-325, -325], [325, 325]]) {
       const pts: THREE.Vector3[] = [];
       for (let i = 0; i < 3; i++) {
         const a = (i / 3) * Math.PI * 2 + (cx < 0 ? 0.3 : 1.3);
@@ -74,8 +74,8 @@ export class Scenery {
 
     // ruta de path payments: curva suave de esquina a esquina con boyas ancla
     const lane = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-245, -3, -150), new THREE.Vector3(-120, -3, -205), new THREE.Vector3(0, -3, -235),
-      new THREE.Vector3(120, -3, -215), new THREE.Vector3(240, -3, -110),
+      new THREE.Vector3(-370, -3, -225), new THREE.Vector3(-180, -3, -310), new THREE.Vector3(0, -3, -355),
+      new THREE.Vector3(180, -3, -325), new THREE.Vector3(360, -3, -165),
     ]);
     const lane2 = new THREE.CatmullRomCurve3(lane.points.map(p => new THREE.Vector3(-p.x, p.y, -p.z)));
     for (const l of [lane, lane2]) {
@@ -111,7 +111,7 @@ export class Scenery {
       const light = glowMat(CYAN, 2);
       sat.add(add(new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 6), light), 0, 1, 0));
       this.group.add(sat);
-      this.sats.push({ obj: sat, light, r: 280 + (i % 2) * 18, speed: 0.02 + i * 0.004, phase: i * 1.6, y: 18 + i * 4 });
+      this.sats.push({ obj: sat, light, r: 420 + (i % 2) * 24, speed: 0.02 + i * 0.004, phase: i * 1.6, y: 18 + i * 4 });
     }
 
     scene.add(this.group);

@@ -27,7 +27,7 @@ export class OrbitRig {
     this.goal.yaw += dYaw;
     this.goal.pitch = THREE.MathUtils.clamp(this.goal.pitch + dPitch, 0.25, 1.48);
   }
-  zoom(f: number) { this.goal.distance = THREE.MathUtils.clamp(this.goal.distance * f, 45, 520); }
+  zoom(f: number) { this.goal.distance = THREE.MathUtils.clamp(this.goal.distance * f, 45, 720); }
   // desplaza en coordenadas de pantalla (derecha / adelante) respecto al giro actual
   pan(right: number, forward: number) {
     const k = this.goal.distance / 200;

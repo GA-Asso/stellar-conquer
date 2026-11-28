@@ -100,7 +100,7 @@ export function createSim(seed = 1): SimState {
   };
 
   // bases en esquinas opuestas; el lado 1 es el espejo del lado 0
-  const coreHex0 = worldToHex({ x: -165, z: 135 });
+  const coreHex0 = worldToHex({ x: -255, z: 205 });
   const coreHex1 = { q: -coreHex0.q, r: -coreHex0.r };
   const core0 = addModule(s, 'core', 0, coreHex0, 1, null);
   const core1 = addModule(s, 'core', 1, coreHex1, 1, null);
@@ -117,13 +117,14 @@ export function createSim(seed = 1): SimState {
   // campos propios: Lumens cerca, metal un poco más lejos
   const c0 = core0.pos;
   const nearFields: [Vec, AsteroidKind, number, number][] = [
-    [{ x: c0.x + 62, z: c0.z + 8 }, 'lumen', 9, 13],
-    [{ x: c0.x - 6, z: c0.z - 64 }, 'metal', 8, 12],
-    [{ x: c0.x + 50, z: c0.z + 55 }, 'energy', 4, 7],
-    [{ x: c0.x + 95, z: c0.z - 70 }, 'lumen', 8, 13],
-    [{ x: c0.x - 30, z: c0.z - 135 }, 'metal', 9, 15],
-    [{ x: c0.x + 140, z: c0.z - 15 }, 'metal', 6, 11],
-    [{ x: c0.x + 40, z: c0.z - 115 }, 'energy', 5, 8],
+    // a más de 85 u de la ciudadela: queda un anillo libre para que la estación crezca
+    [{ x: c0.x + 92, z: c0.z + 10 }, 'lumen', 9, 13],
+    [{ x: c0.x - 8, z: c0.z - 95 }, 'metal', 8, 12],
+    [{ x: c0.x + 72, z: c0.z + 80 }, 'energy', 4, 7],
+    [{ x: c0.x + 140, z: c0.z - 100 }, 'lumen', 8, 13],
+    [{ x: c0.x - 40, z: c0.z - 195 }, 'metal', 9, 15],
+    [{ x: c0.x + 205, z: c0.z - 20 }, 'metal', 6, 11],
+    [{ x: c0.x + 60, z: c0.z - 170 }, 'energy', 5, 8],
   ];
   for (const [center, res, n, spread] of nearFields) {
     const pts = field(center, res, n, spread);
@@ -131,11 +132,13 @@ export function createSim(seed = 1): SimState {
   }
   // campos centrales disputados
   const contested: [Vec, AsteroidKind, number, number][] = [
-    [{ x: -35, z: -40 }, 'lumen', 10, 16],
-    [{ x: 70, z: 25 }, 'metal', 10, 16],
-    [{ x: 30, z: -45 }, 'energy', 6, 9],
-    [{ x: -90, z: 65 }, 'lumen', 7, 12],
-    [{ x: -120, z: -45 }, 'energy', 4, 7],
+    [{ x: -52, z: -60 }, 'lumen', 10, 16],
+    [{ x: 105, z: 38 }, 'metal', 10, 16],
+    [{ x: 45, z: -68 }, 'energy', 6, 9],
+    [{ x: -135, z: 98 }, 'lumen', 7, 12],
+    [{ x: -180, z: -68 }, 'energy', 4, 7],
+    [{ x: 0, z: 300 }, 'metal', 8, 13],
+    [{ x: 300, z: 280 }, 'lumen', 7, 12],
   ];
   for (const [center, res, n, spread] of contested) {
     const pts = field(center, res, n, spread);
@@ -143,9 +146,9 @@ export function createSim(seed = 1): SimState {
   }
 
   const planetPos: [Vec, number][] = [
-    [{ x: 0, z: 0 }, 16],
-    [{ x: -175, z: -120 }, 13], [{ x: 175, z: 120 }, 13],
-    [{ x: -40, z: 175 }, 11], [{ x: 40, z: -175 }, 11],
+    [{ x: 0, z: 0 }, 18],
+    [{ x: -265, z: -180 }, 14], [{ x: 265, z: 180 }, 14],
+    [{ x: -60, z: 265 }, 12], [{ x: 60, z: -265 }, 12],
   ];
   planetPos.forEach(([pos, radius], i) => {
     const p: Planet = { id: s.nextId++, kind: 'planet', name: PLANET_NAMES[i], pos, radius, owner: -1, capture: 0 };
@@ -418,10 +421,10 @@ function spawnAnomaly(s: SimState) {
   const kinds: AsteroidKind[] = ['energy', 'lumen', 'metal'];
   const res = kinds[(s.ledger / ANOMALY.everyLedgers) % 3 | 0];
   for (let attempt = 0; attempt < 20; attempt++) {
-    const a = rng.range(0, Math.PI * 2), r = rng.range(50, 150);
+    const a = rng.range(0, Math.PI * 2), r = rng.range(75, 260);
     const c = { x: Math.cos(a) * r, z: Math.sin(a) * r };
     const clear = (p: Vec) => [...s.entities.values()].every(e =>
-      e.kind === 'unit' || dist(e.pos, p) > (e.kind === 'planet' ? e.radius + 25 : e.kind === 'module' ? 35 : 18));
+      e.kind === 'unit' || dist(e.pos, p) > (e.kind === 'planet' ? e.radius + 25 : e.kind === 'module' ? 50 : 18));
     if (!clear(c) || !clear({ x: -c.x, z: -c.z })) continue;
     for (const center of [c, { x: -c.x, z: -c.z }]) {
       for (let i = 0; i < ANOMALY.rocks; i++) {
