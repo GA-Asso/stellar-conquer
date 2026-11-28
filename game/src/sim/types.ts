@@ -80,6 +80,9 @@ export interface Planet {
   capture: number;
 }
 
+/** agujero negro: frena a todo lo que vuela dentro de su radio (más cuanto más cerca del centro) */
+export interface BlackHole { pos: Vec; radius: number }
+
 export type Entity = Unit | Module | Asteroid | Planet;
 
 export interface Player {
@@ -131,4 +134,5 @@ export interface SimState {
   events: SimEvent[];
   winner: Owner | null;
   winReason: string;
+  holes: BlackHole[];
 }

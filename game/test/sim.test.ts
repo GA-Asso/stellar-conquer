@@ -142,3 +142,28 @@ describe('anomalías', () => {
     expect(asteroids(s).length).toBe(n0 + 10);
   });
 });
+
+describe('agujeros negros', () => {
+  it('frenan a las naves que los cruzan y no dejan construir encima', async () => {
+    const { holeDrag, applyCommand } = await import('../src/sim/sim');
+    const { BLACK_HOLES } = await import('../src/sim/defs');
+    const s = createSim(5);
+    expect(s.holes).toHaveLength(4);
+    const h = s.holes[0];
+    expect(holeDrag(s.holes, h.pos)).toBeCloseTo(BLACK_HOLES.minSpeed, 5);
+    expect(holeDrag(s.holes, { x: h.pos.x + h.radius + 1, z: h.pos.z })).toBe(1);
+    // misma nave, mismo tramo: dentro del agujero avanza mucho menos
+    const run1 = (from: { x: number; z: number }) => {
+      const t = createSim(5);
+      const u = units(t, 0)[0];
+      u.pos = { ...from };
+      applyCommand(t, 0, { kind: 'move', units: [u.id], to: { x: from.x + 60, z: from.z } });
+      for (let i = 0; i < 20; i++) step(t);
+      return u.pos.x - from.x;
+    };
+    const inside = run1({ x: h.pos.x - 3, z: h.pos.z });
+    const outside = run1({ x: 0, z: 120 });
+    expect(inside).toBeLessThan(outside * 0.6);
+    expect(canPlace(s, 0, 'anchor', worldToHex(h.pos)).ok).toBe(false);
+  });
+});

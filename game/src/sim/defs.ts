@@ -210,3 +210,9 @@ export const PLANET = {
 };
 
 export const START_RES: Res = cost(250, 200, 50);
+
+/**
+ * Agujeros negros: dos parejas en espejo entre las bases. Dentro del radio la velocidad cae hasta `minSpeed`
+ * en el centro; rodearlos es más rápido que cruzarlos, pero pueden servir de atajo o de trampa.
+ */
+export const BLACK_HOLES = { minSpeed: 0.3, spots: [{ x: 150, z: 240, r: 38 }, { x: -215, z: 20, r: 34 }] };

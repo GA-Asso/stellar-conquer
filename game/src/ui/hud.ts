@@ -437,6 +437,20 @@ export class Hud {
     c.fillStyle = grad;
     c.fillRect(0, 0, W, W);
 
+    // agujeros negros: zona de frenado en violeta con el centro negro
+    for (const h of s.holes) {
+      const p = this.toMini(h.pos.x, h.pos.z), r = h.radius * k;
+      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      g.addColorStop(0.22, 'rgba(0,0,0,1)');
+      g.addColorStop(0.3, 'rgba(255,170,80,0.75)');
+      g.addColorStop(0.5, 'rgba(140,90,255,0.3)');
+      g.addColorStop(1, 'rgba(140,90,255,0)');
+      c.fillStyle = g;
+      c.beginPath(); c.arc(p.x, p.y, r, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = 'rgba(170,120,255,0.45)'; c.setLineDash([4, 4]);
+      c.stroke(); c.setLineDash([]);
+    }
     const col = (side: number) => side === this.side ? '#2ee6ff' : side === -1 ? '#9aa3c7' : '#ff3d8b';
     // primero planetas y recursos (fondo), luego módulos y unidades (encima)
     for (const e of s.entities.values()) {

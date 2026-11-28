@@ -1,11 +1,11 @@
 // Motor de la simulación: un paso fijo a 20 Hz. Recibe comandos y avanza el estado.
 import {
-  ANOMALY, BEACON_LEDGERS_TO_WIN, DEPOSITS, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
+  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, DEPOSITS, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
 } from './defs';
 import { hexDist, hexKey, hexNeighbors, hexToWorld, worldToHex } from './hex';
 import { Rng } from './rng';
 import type {
-  Asteroid, AsteroidKind, Command, Entity, Era, Hex, Module, ModuleType, Owner, Planet, Player, Res, Side, SimState,
+  Asteroid, AsteroidKind, BlackHole, Command, Entity, Era, Hex, Module, ModuleType, Owner, Planet, Player, Res, Side, SimState,
   Unit, UnitType, Vec,
 } from './types';
 
@@ -96,7 +96,7 @@ export function createSim(seed = 1): SimState {
   const rng = new Rng(seed >>> 0 || 1);
   const s: SimState = {
     tick: 0, ledger: 0, seed, rngState: 0, nextId: 1, entities: new Map(),
-    players: [mkPlayer(0), mkPlayer(1)], events: [], winner: null, winReason: '',
+    players: [mkPlayer(0), mkPlayer(1)], events: [], winner: null, winReason: '', holes: [],
   };
 
   // bases en esquinas opuestas; el lado 1 es el espejo del lado 0
@@ -105,12 +105,18 @@ export function createSim(seed = 1): SimState {
   const core0 = addModule(s, 'core', 0, coreHex0, 1, null);
   const core1 = addModule(s, 'core', 1, coreHex1, 1, null);
 
+  // antes que los campos: ninguna roca nace dentro de un agujero negro
+  for (const h of BLACK_HOLES.spots) {
+    s.holes.push({ pos: { x: h.x, z: h.z }, radius: h.r }, { pos: { x: -h.x, z: -h.z }, radius: h.r });
+  }
+
   const mirror = (p: Vec): Vec => ({ x: -p.x, z: -p.z });
   const field = (center: Vec, res: AsteroidKind, n: number, spread: number): Vec[] => {
     const pts: Vec[] = [];
     for (let i = 0; i < n; i++) {
       const a = rng.range(0, Math.PI * 2), r = rng.range(0, spread);
-      pts.push({ x: center.x + Math.cos(a) * r, z: center.z + Math.sin(a) * r });
+      const p = { x: center.x + Math.cos(a) * r, z: center.z + Math.sin(a) * r };
+      if (s.holes.every(h => dist(h.pos, p) > h.radius + 6)) pts.push(p);
     }
     return pts.map(p => { addAsteroid(s, res, p, rng); return p; });
   };
@@ -202,6 +208,7 @@ export function canPlace(s: SimState, side: Side, type: ModuleType, hex: Hex): P
     if (e.kind === 'asteroid' && dist(e.pos, pos) < e.radius + 11) return { ok: false, reason: 'Hay asteroides' };
     if (e.kind === 'planet' && dist(e.pos, pos) < e.radius + 12) return { ok: false, reason: 'Muy cerca de un planeta' };
   }
+  if (s.holes.some(h => dist(h.pos, pos) < h.radius + 12)) return { ok: false, reason: 'Demasiado cerca de un agujero negro' };
   let parent: Module | null = null;
   for (const n of hexNeighbors(hex)) {
     const m = occupied.get(hexKey(n));
@@ -370,6 +377,7 @@ export function step(s: SimState, cmds: SideCommand[] = []) {
   if (s.winner !== null) return;
   for (const c of cmds) applyCommand(s, c.side, c.cmd);
   obstacles = [];
+  holes = s.holes;
   moving.clear();
   // solo los planetas estorban al vuelo: las naves pasan por encima de los asteroides (en un campo denso,
   // esquivar roca a roca las dejaba rebotando y atascadas)
@@ -424,7 +432,8 @@ function spawnAnomaly(s: SimState) {
     const a = rng.range(0, Math.PI * 2), r = rng.range(75, 260);
     const c = { x: Math.cos(a) * r, z: Math.sin(a) * r };
     const clear = (p: Vec) => [...s.entities.values()].every(e =>
-      e.kind === 'unit' || dist(e.pos, p) > (e.kind === 'planet' ? e.radius + 25 : e.kind === 'module' ? 50 : 18));
+      e.kind === 'unit' || dist(e.pos, p) > (e.kind === 'planet' ? e.radius + 25 : e.kind === 'module' ? 50 : 18))
+      && s.holes.every(h => dist(h.pos, p) > h.radius + 20);
     if (!clear(c) || !clear({ x: -c.x, z: -c.z })) continue;
     for (const center of [c, { x: -c.x, z: -c.z }]) {
       for (let i = 0; i < ANOMALY.rocks; i++) {
@@ -455,6 +464,19 @@ function reap(s: SimState) {
 }
 
 let obstacles: Planet[] = [];
+let holes: BlackHole[] = [];
+
+/** factor de velocidad en un punto: 1 fuera de los agujeros negros, hasta BLACK_HOLES.minSpeed en su centro */
+export function holeDrag(list: BlackHole[], p: Vec): number {
+  let k = 1;
+  for (const h of list) {
+    const d = dist(h.pos, p);
+    if (d >= h.radius) continue;
+    const t = d / h.radius;
+    k = Math.min(k, BLACK_HOLES.minSpeed + (1 - BLACK_HOLES.minSpeed) * t * t);
+  }
+  return k;
+}
 // unidades que se movieron por su cuenta este tick
 const moving = new Set<number>();
 
@@ -489,7 +511,7 @@ function moveTowards(u: Unit, to: Vec, stop: number): boolean {
     const l = Math.hypot(nx, nz) || 1;
     nx /= l; nz /= l;
   }
-  const sp = Math.min(UNITS[u.type].speed * DT, d - stop);
+  const sp = Math.min(UNITS[u.type].speed * DT * holeDrag(holes, u.pos), d - stop);
   moving.add(u.id);
   u.pos.x += nx * sp;
   u.pos.z += nz * sp;
@@ -591,7 +613,7 @@ function stepUnit(s: SimState, u: Unit) {
       const now = dist(u.pos, o.to);
       const gained = (u.lastDist ?? Infinity) - now;
       u.lastDist = now;
-      u.stall = gained < d.speed * DT * 0.25 ? (u.stall ?? 0) + 1 : 0;
+      u.stall = gained < d.speed * DT * holeDrag(holes, u.pos) * 0.25 ? (u.stall ?? 0) + 1 : 0;
       // si el grupo ya ocupa el destino o algo lo bloquea, da la llegada por buena en vez de empujar para siempre
       if (moveTowards(u, o.to, 0.5) || (u.stall > 8 && now < 6 + d.radius * 3) || u.stall > 50) {
         u.order = { kind: 'idle' }; u.stall = 0; u.lastDist = undefined;

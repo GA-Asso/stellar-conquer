@@ -9,6 +9,7 @@ import { iconSprite, MODULE_GLYPH } from './icons';
 import { buildAsteroid, buildConnector, buildModule, buildPlanet, buildUnit, mats, SIDE_COLORS, unitShadow, type Spin } from './models';
 import type { SpaceScene } from './scene';
 import { Scenery } from './scenery';
+import { BlackHoles } from './blackhole';
 
 const CARGO_COLORS: Record<AsteroidKind, THREE.Color> = {
   lumen: new THREE.Color(2.2, 1.8, 0.3),
@@ -47,6 +48,7 @@ export function altitude(e: Entity, t = 0, phase = 0): number {
 export class GameView {
   readonly fx: Fx;
   private scenery: Scenery;
+  private holes: BlackHoles | null = null;
   private views = new Map<number, View>();
   private connectors = new Map<number, THREE.Group>();
   private prev = new Map<number, Vec>();
@@ -61,7 +63,7 @@ export class GameView {
   constructor(private space: SpaceScene, private local: Side) {
     this.fx = new Fx(space.scene);
     this.scenery = new Scenery(space.scene);
-    const hexRing = new THREE.RingGeometry(7.2, 8.4, 6).rotateX(-Math.PI / 2).rotateY(Math.PI / 6);
+    const hexRing = new THREE.RingGeometry(10.2, 11.6, 6).rotateX(-Math.PI / 2).rotateY(Math.PI / 6);
     this.ports = new THREE.InstancedMesh(hexRing, new THREE.MeshBasicMaterial({
       color: new THREE.Color(0.5, 2.2, 1.2), transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide,
     }), 128);
@@ -176,6 +178,8 @@ export class GameView {
     this.time += dt;
     const t = this.time;
     this.scenery.update(t, dt);
+    this.holes ??= new BlackHoles(this.space.scene, s.holes);
+    this.holes.update(t, this.space.camera);
     const rocks: Asteroid[] = [];
     for (const e of s.entities.values()) if (e.kind === 'asteroid') rocks.push(e);
     const alive = new Set<number>();
@@ -368,6 +372,7 @@ export class GameView {
     this.setGhost(null, null, false, []);
     this.space.scene.remove(this.ports);
     this.scenery.dispose();
+    this.holes?.dispose();
   }
 
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado
