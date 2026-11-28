@@ -1,5 +1,6 @@
 // Interfaz del Universo Stellar: wallet, panel del nodo cercano (descubrimiento, DEX, mercado, puerto
 // comercial y Frontera), inventario con la carga de partida y registro de operaciones.
+import { biomeOf } from './planets';
 import {
   ASSETS, ASSET_INFO, ITEMS, MAX_LOADOUT, ROYALTY, addToLoadout, bestRoute, buyFromShop, buyListing, cancelListing,
   discover, equipSkin, fmt, fulfillOrder, itemDef, listItem, quoteReceive, removeFromLoadout, spotPrice, swap,
@@ -106,7 +107,7 @@ export class WorldHud {
     this.$('#u-inv').addEventListener('click', () => this.toggleInventory());
     this.$('#u-obs').addEventListener('click', () => this.toggleObservatory());
     if (atlas) {
-      this.$('#u-legend').innerHTML = `<b>Cada estrella es un proyecto</b>${(['L', 'P', 'D'] as const).map(k =>
+      this.$('#u-legend').innerHTML = `<b>Cada planeta es un proyecto · halo = estado</b>${(['L', 'P', 'D'] as const).map(k =>
         `<span><i style="background:${STATUS_INFO[k].color}"></i>${STATUS_INFO[k].label}</span>`).join('')}
         <span><i style="background:#5d6275"></i>web caída</span><span><i class="ring"></i>con auditoría</span><span><i class="dia"></i>socio</span><span class="u-legend-size">tamaño = financiación SCF + TVL</span>`;
     } else this.$('#u-obs').style.display = 'none';
@@ -170,7 +171,7 @@ export class WorldHud {
       const st = galaxyStats(this.atlas, g.id);
       stats = g.id === 'socios'
         ? `<em>${st.partners} socios del ecosistema</em>`
-        : `<em>${st.projects} proyectos · ${st.live} en producción · SCF ${usd(st.scf)}${st.tvl ? ` · TVL ${usd(st.tvl)}` : ''} · ${st.audited} auditados</em>`;
+        : `<em>${biomeOf(g.id).label} · ${st.projects} proyectos · ${st.live} en producción · SCF ${usd(st.scf)}${st.tvl ? ` · TVL ${usd(st.tvl)}` : ''} · ${st.audited} auditados</em>`;
     }
     el.innerHTML = `<b style="color:${g.color}">${esc(g.name)}</b><span>${esc(g.blurb)}</span>${stats}`;
     el.classList.add('on');
