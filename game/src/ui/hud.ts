@@ -1,8 +1,8 @@
 // HUD: recursos, ledger, panel de selección, botonera de órdenes, minimapa y avisos.
 import { Vector3 } from 'three';
-import { DEPOSITS, ERA_UP, ERAS, LEDGER_TICKS, MAP_HALF, MODULES, TICK_HZ, UNITS } from '../sim/defs';
-import { canAfford, cometHead, coreOf, hasBuilt, hiddenFrom, popCap, popUsed } from '../sim/sim';
-import type { Command, Entity, Module, ModuleType, Res, Side, SimState, Unit, UnitType } from '../sim/types';
+import { DEPOSITS, ERA_UP, ERAS, LEDGER_TICKS, MAP_HALF, MARKET, MODULES, TICK_HZ, UNITS } from '../sim/defs';
+import { canAfford, cometHead, coreOf, hasBuilt, hiddenFrom, marketAccess, marketQuote, popCap, popUsed } from '../sim/sim';
+import type { Command, Entity, Module, ModuleType, Res, ResKey, Side, SimState, Unit, UnitType } from '../sim/types';
 import type { GameView } from '../render/view';
 import type { SpaceScene } from '../render/scene';
 import type { Input } from './input';
@@ -113,6 +113,7 @@ export class Hud {
           <dt>El mapa</dt><dd><b>Agujero negro</b>: frena a quien lo cruza · <b>Agujero de gusano</b>: manda tropas a una boca y salen por la del mismo color · <b>Nebulosa</b>: dentro no te ven desde lejos · <b>Cometa</b>: aparta tus tropas de la franja; deja cristales · <b>Planeta</b>: conquístalo o bombardéalo para romperlo</dd>
         </dl>
       </details>
+      <div class="market-panel" id="market"></div>
       <div class="tip" id="tip"></div>
       <div class="hover-label" id="hover"></div>
       <div class="toasts"></div>
@@ -213,6 +214,7 @@ export class Hud {
 
   update(s: SimState) {
     const pl = s.players[this.side];
+    this.updateMarket(s);
     this.el['r-l'].textContent = fmt(pl.res.lumens);
     this.el['r-m'].textContent = fmt(pl.res.metal);
     this.el['r-e'].textContent = fmt(pl.res.energy);
@@ -314,6 +316,45 @@ export class Hud {
     const head = sel.length > 1 ? `Selección<span>${sel.length} unidades</span>` : 'Selección';
     const h = this.root.querySelector<HTMLElement>('#sel-head')!;
     if (h.innerHTML !== head) h.innerHTML = head;
+  }
+
+  // ---------- Mercado Central ----------
+
+  private marketKey = '';
+  private marketWired = false;
+  private hadAccess = false;
+
+  /** panel de comercio: se abre solo cuando tienes flota junto al Mercado Central */
+  private updateMarket(s: SimState) {
+    const el = this.root.querySelector('#market') as HTMLDivElement;
+    if (!this.marketWired) {
+      this.marketWired = true;
+      el.addEventListener('click', e => {
+        const b = (e.target as HTMLElement).closest('button[data-give]') as HTMLButtonElement | null;
+        if (b && !b.disabled) this.send({ kind: 'trade', give: b.dataset.give as ResKey, get: b.dataset.get as ResKey });
+      });
+    }
+    const access = marketAccess(s, this.side);
+    if (access && !this.hadAccess) this.toast('Llegaste al Mercado Central: cambia recursos en el panel de la derecha', 'good');
+    this.hadAccess = access;
+    const pl = s.players[this.side];
+    const keys: ResKey[] = ['lumens', 'metal', 'energy'];
+    const NAME: Record<ResKey, string> = { lumens: 'Lumens', metal: 'metal', energy: 'energía' };
+    const CLS: Record<ResKey, string> = { lumens: 'c-l', metal: 'c-m', energy: 'c-e' };
+    const pairs = keys.flatMap(g => keys.filter(x => x !== g).map(x => [g, x] as const));
+    const quotes = pairs.map(([g, x]) => marketQuote(s, g, x));
+    const key = `${access}|${quotes.join(',')}|${keys.map(k => pl.res[k] >= MARKET.lot ? 1 : 0).join('')}`;
+    if (key === this.marketKey) return;
+    this.marketKey = key;
+    el.classList.toggle('open', access);
+    if (!access) {
+      el.innerHTML = `<b>Mercado Central</b><span>Lleva una nave o un robot al centro del mapa para cambiar recursos</span>`;
+      return;
+    }
+    el.innerHTML = `<header><b>Mercado Central</b><span>lote de ${MARKET.lot} · comisión ${Math.round(MARKET.fee * 100)} %</span></header>
+      <div class="mk-grid">${pairs.map(([g, x], i) => `<button data-give="${g}" data-get="${x}" ${pl.res[g] < MARKET.lot ? 'disabled' : ''}
+        title="Das ${MARKET.lot} de ${NAME[g]} y recibes ${quotes[i]} de ${NAME[x]}"><span class="${CLS[g]}">${MARKET.lot}</span><i>→</i><span class="${CLS[x]}">${quotes[i]}</span></button>`).join('')}</div>
+      <footer>Vender abarata lo que vendes y encarece lo que compras; los precios se recuperan con cada ledger.</footer>`;
   }
 
   private card(name: string, desc: string, hp: number, max: number, side: number, extra: string, hint = '', glyph = '', img = '') {
@@ -464,6 +505,17 @@ export class Hud {
     c.fillStyle = grad;
     c.fillRect(0, 0, W, W);
 
+    // Mercado Central: octógono dorado y su zona de acceso
+    {
+      const p = this.toMini(MARKET.pos.x, MARKET.pos.z), r = Math.max(6, MARKET.radius * k);
+      c.strokeStyle = 'rgba(253,218,36,0.35)'; c.setLineDash([3, 4]);
+      c.beginPath(); c.arc(p.x, p.y, MARKET.reach * k, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+      c.beginPath();
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8; c.lineTo(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r); }
+      c.closePath(); c.fillStyle = 'rgba(253,218,36,0.85)'; c.fill();
+      c.fillStyle = '#06070d'; c.font = `700 ${Math.round(r * 1.2)}px system-ui`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('$', p.x, p.y + 1);
+    }
     // cometa: su trayectoria (aviso) y la cabeza mientras cruza
     if (s.comet) {
       const a = this.toMini(s.comet.from.x, s.comet.from.z), b = this.toMini(s.comet.to.x, s.comet.to.z);

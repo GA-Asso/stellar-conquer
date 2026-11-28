@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { MODULES, PLANET, UNITS } from '../sim/defs';
 import { hexToWorld } from '../sim/hex';
-import { coreOf, dist, hiddenFrom } from '../sim/sim';
+import { coreOf, dist, hiddenFrom, marketAccess } from '../sim/sim';
 import type { Asteroid, AsteroidKind, Entity, Hex, ModuleType, Side, SimState, Unit, Vec } from '../sim/types';
 import { Fx } from './fx';
 import { iconSprite, MODULE_GLYPH, MODULE_ROLE, ROLE_INFO } from './icons';
@@ -13,6 +13,7 @@ import { BlackHoles } from './blackhole';
 import { Wormholes } from './wormhole';
 import { Nebulae } from './nebula';
 import { CometView } from './comet';
+import { MarketView } from './market';
 
 const CARGO_COLORS: Record<AsteroidKind, THREE.Color> = {
   lumen: new THREE.Color(2.2, 1.8, 0.3),
@@ -55,6 +56,7 @@ export class GameView {
   private worms: Wormholes | null = null;
   private nebulae: Nebulae | null = null;
   private comet: CometView | null = null;
+  private market: MarketView | null = null;
   private views = new Map<number, View>();
   private connectors = new Map<number, THREE.Group>();
   private prev = new Map<number, Vec>();
@@ -211,6 +213,8 @@ export class GameView {
     this.nebulae.update(t);
     this.comet ??= new CometView(this.space.scene);
     this.comet.update(s, alpha, dt);
+    this.market ??= new MarketView(this.space.scene);
+    this.market.update(t, dt, this.space.camera, marketAccess(s, this.local));
     const rocks: Asteroid[] = [];
     for (const e of s.entities.values()) if (e.kind === 'asteroid') rocks.push(e);
     const alive = new Set<number>();
@@ -414,6 +418,7 @@ export class GameView {
     this.worms?.dispose();
     this.nebulae?.dispose();
     this.comet?.dispose();
+    this.market?.dispose();
   }
 
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado

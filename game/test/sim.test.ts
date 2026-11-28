@@ -19,7 +19,8 @@ describe('partida inicial', () => {
     const c0 = coreOf(a, 0)!, c1 = coreOf(a, 1)!;
     expect(c0.pos.x).toBeCloseTo(-c1.pos.x);
     expect(units(a, 0)).toHaveLength(4);
-    expect(planets(a)).toHaveLength(5);
+    // 4 planetas: el centro es del Mercado Central
+    expect(planets(a)).toHaveLength(4);
     expect(asteroids(a).length).toBeGreaterThan(40);
   });
 
@@ -267,5 +268,29 @@ describe('cometas', () => {
     // simetría: cada cristal nuevo tiene su espejo
     const fresh = crystals.slice(crystals0);
     for (const c of fresh) expect(fresh.some(o => Math.abs(o.pos.x + c.pos.x) < 1e-6 && Math.abs(o.pos.z + c.pos.z) < 1e-6)).toBe(true);
+  });
+});
+
+describe('Mercado Central', () => {
+  it('solo comercia quien tiene flota junto al mercado, y los precios se mueven', async () => {
+    const { applyCommand, addUnit, marketQuote } = await import('../src/sim/sim');
+    const { MARKET } = await import('../src/sim/defs');
+    const s = createSim(2);
+    const pl = s.players[0];
+    pl.res = { lumens: 1000, metal: 1000, energy: 1000 };
+    applyCommand(s, 0, { kind: 'trade', give: 'lumens', get: 'metal' });
+    expect(pl.res.lumens).toBe(1000);
+    addUnit(s, 'interceptor', 0, { x: MARKET.pos.x + 20, z: MARKET.pos.z });
+    const q = marketQuote(s, 'lumens', 'metal');
+    expect(q).toBe(Math.floor(MARKET.lot * (1 - MARKET.fee)));
+    applyCommand(s, 0, { kind: 'trade', give: 'lumens', get: 'metal' });
+    expect(pl.res.lumens).toBe(900);
+    expect(pl.res.metal).toBe(1000 + q);
+    // vender más Lumens rinde menos
+    expect(marketQuote(s, 'lumens', 'metal')).toBeLessThan(q);
+    // con los ledgers el precio vuelve hacia la base
+    const p0 = s.market.price.lumens;
+    run(s, (LEDGER_TICKS / TICK_HZ) * 3);
+    expect(s.market.price.lumens).toBeGreaterThan(p0);
   });
 });

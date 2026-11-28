@@ -241,4 +241,12 @@ export const NEBULAE = { sight: 20, spots: [{ x: 80, z: 130, r: 46 }, { x: -300,
  */
 export const COMET = { everyLedgers: 20, offsetLedgers: 8, warnTicks: 80, flightTicks: 150, reach: 9, damagePerTick: 10, drops: [0.28, 0.4], rocks: 3, richness: 1.4 };
 
+/**
+ * Mercado Central, en el centro del mapa: quien tenga una nave o robot dentro de `reach` cambia lotes de
+ * recursos. Cada venta abarata lo vendido y encarece lo comprado (`step`); con cada ledger los precios
+ * vuelven poco a poco a su base. La comisión hace que comerciar cueste algo frente a minar.
+ */
+export const MARKET = { pos: { x: 0, z: 0 }, radius: 20, reach: 60, lot: 100, fee: 0.12, step: 0.06, relax: 0.15,
+  base: { lumens: 1, metal: 1, energy: 2 } as Res, min: 0.35, max: 3 };
+
 export const BLACK_HOLES = { minSpeed: 0.3, spots: [{ x: 150, z: 240, r: 38 }, { x: -215, z: 20, r: 34 }] };

@@ -1,11 +1,11 @@
 // Motor de la simulación: un paso fijo a 20 Hz. Recibe comandos y avanza el estado.
 import {
-  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, COMET, DEPOSITS, NEBULAE, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
+  ANOMALY, BEACON_LEDGERS_TO_WIN, BLACK_HOLES, COMET, DEPOSITS, MARKET, NEBULAE, WORMHOLES, DT, ERA_UP, GATHER, LEDGER_TICKS, MAP_HALF, MODULES, PLANET, POP_MAX, START_RES, UNITS,
 } from './defs';
 import { hexDist, hexKey, hexNeighbors, hexToWorld, worldToHex } from './hex';
 import { Rng } from './rng';
 import type {
-  Asteroid, AsteroidKind, BlackHole, Comet, Command, Entity, Era, Hex, Module, ModuleType, Owner, Planet, Player, Res, Side, SimState,
+  Asteroid, AsteroidKind, BlackHole, Comet, Command, ResKey, Entity, Era, Hex, Module, ModuleType, Owner, Planet, Player, Res, Side, SimState,
   Unit, UnitType, Vec,
 } from './types';
 
@@ -90,7 +90,8 @@ function addModule(s: SimState, type: ModuleType, side: Side, hex: Hex, built: n
   return m;
 }
 
-const PLANET_NAMES = ['Quórum', 'Horizonte', 'Lumenia', 'Soroban Prime', 'Ancla-7'];
+// el centro del mapa es del Mercado Central
+const PLANET_NAMES = ['Horizonte', 'Lumenia', 'Soroban Prime', 'Ancla-7'];
 
 export function createSim(seed = 1): SimState {
   const rng = new Rng(seed >>> 0 || 1);
@@ -98,6 +99,7 @@ export function createSim(seed = 1): SimState {
     tick: 0, ledger: 0, seed, rngState: 0, nextId: 1, entities: new Map(),
     players: [mkPlayer(0), mkPlayer(1)], events: [], winner: null, winReason: '', holes: [], wormholes: WORMHOLES.pairs.map(p => ({ a: { ...p.a }, b: { ...p.b }, radius: WORMHOLES.radius })),
     comet: null,
+    market: { price: { ...MARKET.base } },
     nebulae: NEBULAE.spots.flatMap(n => [{ pos: { x: n.x, z: n.z }, radius: n.r }, { pos: { x: -n.x, z: -n.z }, radius: n.r }]),
   };
 
@@ -154,7 +156,6 @@ export function createSim(seed = 1): SimState {
   }
 
   const planetPos: [Vec, number][] = [
-    [{ x: 0, z: 0 }, 18],
     [{ x: -265, z: -180 }, 14], [{ x: 265, z: 180 }, 14],
     [{ x: -60, z: 265 }, 12], [{ x: 60, z: -265 }, 12],
   ];
@@ -213,6 +214,7 @@ export function canPlace(s: SimState, side: Side, type: ModuleType, hex: Hex): P
     if (e.kind === 'planet' && dist(e.pos, pos) < e.radius + 12) return { ok: false, reason: 'Muy cerca de un planeta' };
   }
   if (s.holes.some(h => dist(h.pos, pos) < h.radius + 12)) return { ok: false, reason: 'Demasiado cerca de un agujero negro' };
+  if (dist(MARKET.pos, pos) < MARKET.radius + 14) return { ok: false, reason: 'Es el Mercado Central' };
   if (s.wormholes.some(w => dist(w.a, pos) < w.radius + 12 || dist(w.b, pos) < w.radius + 12)) return { ok: false, reason: 'Demasiado cerca de un agujero de gusano' };
   let parent: Module | null = null;
   for (const n of hexNeighbors(hex)) {
@@ -372,6 +374,19 @@ export function applyCommand(s: SimState, side: Side, cmd: Command) {
       else refund(pl.res, UNITS[q.item].cost);
       break;
     }
+    case 'trade': {
+      if (cmd.give === cmd.get || !marketAccess(s, side)) return;
+      const q = marketQuote(s, cmd.give, cmd.get);
+      const res = s.players[side].res;
+      if (res[cmd.give] < MARKET.lot) return;
+      res[cmd.give] -= MARKET.lot;
+      res[cmd.get] += q;
+      const p = s.market.price;
+      p[cmd.give] = Math.max(MARKET.base[cmd.give] * MARKET.min, p[cmd.give] * (1 - MARKET.step));
+      p[cmd.get] = Math.min(MARKET.base[cmd.get] * MARKET.max, p[cmd.get] * (1 + MARKET.step));
+      s.events.push({ kind: 'trade', side, give: cmd.give, get: cmd.get, paid: MARKET.lot, got: q });
+      break;
+    }
     case 'rally': {
       const m = s.entities.get(cmd.module);
       if (m && m.kind === 'module' && m.side === side) m.rally = { ...cmd.to };
@@ -493,6 +508,7 @@ function closeLedger(s: SimState) {
   s.events.push({ kind: 'ledger', seq: s.ledger });
   for (const p of planets(s)) if (p.owner !== -1) s.players[p.owner].res.lumens += PLANET.incomePerLedger;
   if (s.ledger % ANOMALY.everyLedgers === 0) spawnAnomaly(s);
+  for (const k of ['lumens', 'metal', 'energy'] as const) s.market.price[k] += (MARKET.base[k] - s.market.price[k]) * MARKET.relax;
   if (s.ledger % COMET.everyLedgers === COMET.offsetLedgers && !s.comet) launchComet(s);
   for (const m of modules(s)) {
     const inc = MODULES[m.type].perLedger;
@@ -518,7 +534,7 @@ function spawnAnomaly(s: SimState) {
     const c = { x: Math.cos(a) * r, z: Math.sin(a) * r };
     const clear = (p: Vec) => [...s.entities.values()].every(e =>
       e.kind === 'unit' || dist(e.pos, p) > (e.kind === 'planet' ? e.radius + 25 : e.kind === 'module' ? 50 : 18))
-      && s.holes.every(h => dist(h.pos, p) > h.radius + 20);
+      && s.holes.every(h => dist(h.pos, p) > h.radius + 20) && dist(MARKET.pos, p) > MARKET.radius + 25;
     if (!clear(c) || !clear({ x: -c.x, z: -c.z })) continue;
     for (const center of [c, { x: -c.x, z: -c.z }]) {
       for (let i = 0; i < ANOMALY.rocks; i++) {
@@ -641,6 +657,20 @@ function face(u: Unit, p: Vec) { u.facing = Math.atan2(p.x - u.pos.x, p.z - u.po
 function damageMult(attackerShipMul: number, attackerModMul: number, target: Unit | Module): number {
   if (target.kind === 'module') return attackerModMul;
   return UNITS[target.type].cls === 'ship' ? attackerShipMul : 1;
+}
+
+/** ¿tiene el bando una nave o robot junto al Mercado Central? (los drones no cuentan: hay que llevar flota) */
+export function marketAccess(s: SimState, side: Side): boolean {
+  for (const e of s.entities.values()) {
+    if (e.kind === 'unit' && e.side === side && e.type !== 'drone' && dist(e.pos, MARKET.pos) <= MARKET.reach) return true;
+  }
+  return false;
+}
+
+/** cuánto recibes por un lote de `give` a cambio de `get`, con la comisión ya descontada */
+export function marketQuote(s: SimState, give: ResKey, get: ResKey): number {
+  const p = s.market.price;
+  return Math.floor(MARKET.lot * (p[give] / p[get]) * (1 - MARKET.fee));
 }
 
 /** ¿está `pos` dentro de una nebulosa iónica? */

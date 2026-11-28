@@ -128,6 +128,7 @@ export type SimEvent =
   | { kind: 'era'; side: Side; era: Era }
   | { kind: 'anomaly'; pos: Vec; res: AsteroidKind }
   | { kind: 'comet'; phase: 'warn' | 'drop'; from: Vec; to: Vec }
+  | { kind: 'trade'; side: Side; give: ResKey; get: ResKey; paid: number; got: number }
   | { kind: 'warp'; from: Vec; to: Vec; side: Side }
   | { kind: 'planetDestroyed'; pos: Vec; radius: number; name: string; side: Owner; loot: Res };
 
@@ -140,7 +141,8 @@ export type Command =
   | { kind: 'train'; module: number; unit: UnitType }
   | { kind: 'era'; module: number }
   | { kind: 'cancel'; module: number }
-  | { kind: 'rally'; module: number; to: Vec };
+  | { kind: 'rally'; module: number; to: Vec }
+  | { kind: 'trade'; give: ResKey; get: ResKey };
 
 export interface SimState {
   tick: number;
@@ -157,4 +159,6 @@ export interface SimState {
   wormholes: Wormhole[];
   nebulae: Nebula[];
   comet: Comet | null;
+  // precios del Mercado Central, en Lumens por unidad: suben al comprar y bajan al vender
+  market: { price: Res };
 }
