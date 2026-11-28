@@ -32,10 +32,22 @@ export class OrbitRig {
     this.goal.yaw += dYaw;
     this.goal.pitch = THREE.MathUtils.clamp(this.goal.pitch + dPitch, 0.25, 1.48);
   }
-  zoom(f: number) { this.goal.distance = THREE.MathUtils.clamp(this.goal.distance * f, 45, 720); }
+  /** límites del zoom: la partida los amplía porque usa un campo de visión más cerrado */
+  minDist = 45;
+  maxDist = 720;
+  zoom(f: number) { this.goal.distance = THREE.MathUtils.clamp(this.goal.distance * f, this.minDist, this.maxDist); }
+  /** cambia el campo de visión manteniendo el mismo encuadre (se acerca o aleja la cámara en proporción) */
+  setFov(fov: number) {
+    const f = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) / Math.tan(THREE.MathUtils.degToRad(fov / 2));
+    this.camera.fov = fov;
+    this.camera.updateProjectionMatrix();
+    this.distance *= f; this.goal.distance *= f; this.minDist *= f; this.maxDist *= f;
+  }
+  /** distancia equivalente con el campo de visión de 50° (para que el resto del código no dependa del fov) */
+  get framing() { return this.distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) / Math.tan(THREE.MathUtils.degToRad(25)); }
   // desplaza en coordenadas de pantalla (derecha / adelante) respecto al giro actual
   pan(right: number, forward: number) {
-    const k = this.goal.distance / 200;
+    const k = (this.goal.distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) / Math.tan(THREE.MathUtils.degToRad(25))) / 200;
     const sx = Math.cos(this.goal.yaw), sz = -Math.sin(this.goal.yaw);
     const fx = -Math.sin(this.goal.yaw), fz = -Math.cos(this.goal.yaw);
     this.goal.target.x += (sx * right + fx * forward) * k;

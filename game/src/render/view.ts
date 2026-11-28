@@ -49,6 +49,9 @@ export function altitude(e: Entity, t = 0, phase = 0): number {
   return 0;
 }
 
+/** campo de visión de la partida (el Universo usa 50°) */
+const GAME_FOV = 32;
+
 export class GameView {
   readonly fx: Fx;
   private scenery: Scenery;
@@ -69,6 +72,9 @@ export class GameView {
   private time = 0;
 
   constructor(private space: SpaceScene, private local: Side) {
+    // campo de visión cerrado (casi ortográfico, como un RTS clásico): las unidades no cambian tanto de tamaño
+    // entre el centro y el borde de la pantalla ni al inclinar la cámara
+    space.rig.setFov(GAME_FOV);
     this.fx = new Fx(space.scene);
     this.scenery = new Scenery(space.scene);
     const hexRing = new THREE.RingGeometry(10.2, 11.6, 6).rotateX(-Math.PI / 2).rotateY(Math.PI / 6);
@@ -180,7 +186,8 @@ export class GameView {
       if (e.type !== 'core') root.add(rolePad(r, roleColor));
       const icon = iconSprite(MODULE_GLYPH[e.type], '#' + SIDE_COLORS[e.side].getHexString(), roleColor);
       icon.position.y = e.type === 'beacon' ? 40 : e.type === 'core' ? 50 : 20;
-      icon.scale.setScalar(e.type === 'core' ? 0.06 : 0.034);
+      // tamaño fijo en pantalla, compensado por el campo de visión cerrado de la partida
+      icon.scale.setScalar((e.type === 'core' ? 0.06 : 0.034) * (GAME_FOV / 50));
       root.add(icon);
       v = { root, model: b.group, spins: b.spins, tick: b.tick, cage, phase: 0 };
     } else if (e.kind === 'asteroid') {
@@ -218,11 +225,17 @@ export class GameView {
     const rocks: Asteroid[] = [];
     for (const e of s.entities.values()) if (e.kind === 'asteroid') rocks.push(e);
     const alive = new Set<number>();
+    // al alejar la cámara las unidades crecen un poco para seguir leyéndose (hasta +80 %)
+    const boost = 1 + THREE.MathUtils.clamp((this.space.rig.framing - 200) / 450, 0, 0.8);
     for (const e of s.entities.values()) {
       alive.add(e.id);
       const v = this.views.get(e.id) ?? this.create(e);
       // rivales escondidos en una nebulosa: no se dibujan hasta que alguien tuyo se acerque
-      if (e.kind === 'unit') v.root.visible = !hiddenFrom(s, e, this.local);
+      if (e.kind === 'unit') {
+        v.root.visible = !hiddenFrom(s, e, this.local);
+        // los drones recolectores son pequeños: un poco más grandes para que se distingan
+        v.root.scale.setScalar(boost * (e.type === 'drone' ? 1.5 : 1));
+      }
       let p = this.renderPos(e, alpha);
       if (e.kind === 'unit') {
         // filtro suave: oculta los empujones de un tick entre unidades apretadas
@@ -419,6 +432,7 @@ export class GameView {
     this.nebulae?.dispose();
     this.comet?.dispose();
     this.market?.dispose();
+    this.space.rig.setFov(50);
   }
 
   // materiales compartidos: se exponen para que el HUD pinte iconos con el color del lado

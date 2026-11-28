@@ -597,7 +597,7 @@ export class Hud {
     // vista de la cámara: trapecio según el giro
     const rig = this.space.rig;
     const t = this.toMini(rig.target.x, rig.target.z);
-    const r = rig.distance * 0.45 * k;
+    const r = rig.framing * 0.45 * k;
     c.save();
     c.translate(t.x, t.y);
     c.rotate(-rig.yaw);
